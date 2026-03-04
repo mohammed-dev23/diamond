@@ -1,11 +1,14 @@
 pub mod safe {
     use core::fmt;
-    use std::fs;
+    use std::{fs, ops::Deref};
 
     use anyhow::anyhow;
     use colored::Colorize;
 
-    use crate::dec_enc::{action_pass_maker, action_pass_val, home_dirr, read_yaml};
+    use crate::{
+        backend::parser::Token,
+        dec_enc::{action_pass_maker, action_pass_val, home_dirr, read_yaml},
+    };
 
     pub trait Checkers {
         type Out;
@@ -46,10 +49,10 @@ pub mod safe {
         type Out = anyhow::Result<String>;
 
         fn master_key_checker(self) -> Self::Out {
-            if self.len() >= 12 {
+            if self.len() >= 16 {
                 return Ok(self);
             } else {
-                return Err(anyhow!("The master key must be 12 checkters at least "));
+                return Err(anyhow!("The master key must be 16 characters at least "));
             }
         }
     }
@@ -112,31 +115,56 @@ pub mod safe {
     }
 
     #[derive(PartialEq, Debug)]
-    pub enum PasswordCheckerT {
-        VeryWeek,
-        Week,
-        Fair,
-        Good,
-        Strong,
+    pub enum PasswordCheckerT<'s> {
+        VeryWeak(&'s String),
+        Weak(&'s String),
+        Fair(&'s String),
+        Good(&'s String),
+        Strong(&'s String),
     }
 
-    impl fmt::Display for PasswordCheckerT {
+    impl fmt::Display for PasswordCheckerT<'_> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                PasswordCheckerT::VeryWeek => {
-                    write!(f, "the password is [{}]", "very week".bright_red().bold())
+                PasswordCheckerT::VeryWeak(pwd) => {
+                    write!(
+                        f,
+                        "the password <{}> is [{}]",
+                        pwd.bright_yellow().bold(),
+                        "very Weak".bright_red().bold()
+                    )
                 }
-                PasswordCheckerT::Week => {
-                    write!(f, "the password is [{}]", "week".bright_red().bold())
+                PasswordCheckerT::Weak(pwd) => {
+                    write!(
+                        f,
+                        "the password <{}> is [{}]",
+                        pwd.bright_yellow().bold(),
+                        "Weak".bright_red().bold()
+                    )
                 }
-                PasswordCheckerT::Fair => {
-                    write!(f, "the password is [{}]", "fair".bright_yellow().bold())
+                PasswordCheckerT::Fair(pwd) => {
+                    write!(
+                        f,
+                        "the password <{}> is [{}]",
+                        pwd.bright_yellow().bold(),
+                        "fair".bright_yellow().bold()
+                    )
                 }
-                PasswordCheckerT::Good => {
-                    write!(f, "the password is [{}]", "good".bright_cyan().bold())
+                PasswordCheckerT::Good(pwd) => {
+                    write!(
+                        f,
+                        "the password <{}> is [{}]",
+                        pwd.bright_yellow().bold(),
+                        "good".bright_cyan().bold()
+                    )
                 }
-                PasswordCheckerT::Strong => {
-                    write!(f, "the password is [{}]", "strong".bright_green().bold())
+                PasswordCheckerT::Strong(pwd) => {
+                    write!(
+                        f,
+                        "the password <{}> is [{}]",
+                        pwd.bright_yellow().bold(),
+                        "strong".bright_green().bold()
+                    )
                 }
             }
         }
@@ -145,13 +173,13 @@ pub mod safe {
     pub trait PasswordChecker {
         type Out;
 
-        fn check_password_(&self) -> Self::Out;
+        fn check_password_(&self, pwd: &String) -> Self::Out;
     }
 
     impl PasswordChecker for String {
         type Out = anyhow::Result<String>;
 
-        fn check_password_(&self) -> Self::Out {
+        fn check_password_(&self, pwd: &String) -> Self::Out {
             let mut score = 0;
 
             if self.len() >= 8 {
@@ -181,19 +209,36 @@ pub mod safe {
             }
 
             let sc = match score {
-                0..=2 => PasswordCheckerT::VeryWeek,
-                3..=4 => PasswordCheckerT::Week,
-                5..=6 => PasswordCheckerT::Fair,
-                7..=8 => PasswordCheckerT::Good,
-                _ => PasswordCheckerT::Strong,
+                0..=2 => PasswordCheckerT::VeryWeak(pwd),
+                3..=4 => PasswordCheckerT::Weak(pwd),
+                5..=6 => PasswordCheckerT::Fair(pwd),
+                7..=8 => PasswordCheckerT::Good(pwd),
+                _ => PasswordCheckerT::Strong(pwd),
             };
 
-            if sc == PasswordCheckerT::VeryWeek || sc == PasswordCheckerT::Week {
+            if sc == PasswordCheckerT::VeryWeak(pwd) || sc == PasswordCheckerT::Weak(pwd) {
                 return Err(anyhow!("{}", sc));
             }
             println!(">>{}", sc);
             return Ok(self.to_string());
         }
+    }
+
+    pub fn does_not_e(
+        url_app: &String,
+        token: usize,
+        data: &Vec<String>,
+        ef: Option<String>,
+    ) -> anyhow::Result<()> {
+        if url_app
+            .deref()
+            .to_string()
+            .check_existing_url_apps(&*data.get_token(token)?, ef.as_ref())
+            .is_ok()
+        {
+            return Err(anyhow!("The url/app does not exist!"));
+        }
+        Ok(())
     }
 }
 

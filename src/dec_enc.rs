@@ -1,7 +1,13 @@
 use anyhow::anyhow;
 use base64::prelude::*;
 use colored::Colorize;
-use std::{env::home_dir, fs, io::Read, path::PathBuf};
+use std::{
+    env::home_dir,
+    fs,
+    io::{Read, Write, stdin, stdout},
+    ops::Deref,
+    path::PathBuf,
+};
 use zeroize::Zeroizing;
 
 use aes_gcm::{
@@ -61,9 +67,11 @@ pub fn pre_add(
     if let Some(o) = ef {
         fs::File::create(o)?;
         fs::write(home_dirr()?.join(o), yaml)?;
+        #[cfg(unix)]
         set_perm_over_file(&home_dirr()?.join(o))?;
     } else {
         fs::write(home_dirr()?.join("obsidian/obs.yaml"), yaml)?;
+        #[cfg(unix)]
         set_perm_over_file(&home_dirr()?.join("obsidian/obs.yaml"))?;
     }
 
@@ -100,9 +108,11 @@ pub fn add(
     if let Some(o) = ef {
         fs::File::create(o)?;
         fs::write(home_dirr()?.join(o), yaml)?;
+        #[cfg(unix)]
         set_perm_over_file(&home_dirr()?.join(o))?;
     } else {
         fs::write(home_dirr()?.join("obsidian/obs.yaml"), yaml)?;
+        #[cfg(unix)]
         set_perm_over_file(&home_dirr()?.join("obsidian/obs.yaml"))?;
     }
 
@@ -242,7 +252,7 @@ pub fn action_pass_maker(action_pass: &str) -> anyhow::Result<()> {
             .to_string_lossy()
             .to_string(),
     )?;
-    set_perm_over_file(&home_dirr()?.join("obsidian/obs_password.txt"))?;
+    set_perm_over_file_read_only(&home_dirr()?.join("obsidian/obs_password.txt"))?;
 
     let ac_pass = action_pass.trim();
 
@@ -312,25 +322,43 @@ pub fn action_pass_val(action_pass: &str) -> anyhow::Result<()> {
 pub fn remove(url_app: &String, ef: Option<&String>) -> anyhow::Result<()> {
     let mut read_yaml = read_yaml(ef)?;
 
-    if let Some(o) = read_yaml.iter().position(|s| s.url_app == *url_app) {
-        read_yaml.remove(o);
-    }
-
-    let yaml = serde_yaml::to_string(&read_yaml)?;
-
-    if let Some(ef) = ef {
-        fs::write(home_dirr()?.join(ef), yaml)?;
-        set_perm_over_file(&home_dirr()?.join(ef))?;
-    } else {
-        fs::write(home_dirr()?.join("obsidian/obs.yaml"), yaml)?;
-        set_perm_over_file(&home_dirr()?.join("obsidian/obs.yaml"))?;
-    }
-
     println!(
-        ">>{} removed [{}]",
-        "obsidian".bright_cyan().bold(),
-        url_app.bright_white().bold()
+        ">> are you sure you want to delete <{}>",
+        url_app.bright_red().bold(),
     );
+    print!(
+        ">>[{}/{}]: ",
+        "y".bright_cyan().bold(),
+        "n".bright_red().bold()
+    );
+    stdout().flush()?;
+
+    let mut str = String::new();
+    stdin().read_line(&mut str)?;
+
+    if str.trim() == "y" {
+        if let Some(o) = read_yaml.iter().position(|s| s.url_app == *url_app) {
+            read_yaml.remove(o);
+        }
+
+        let yaml = serde_yaml::to_string(&read_yaml)?;
+
+        if let Some(ef) = ef {
+            fs::write(home_dirr()?.join(ef), yaml)?;
+            #[cfg(unix)]
+            set_perm_over_file(&home_dirr()?.join(ef))?;
+        } else {
+            fs::write(home_dirr()?.join("obsidian/obs.yaml"), yaml)?;
+            #[cfg(unix)]
+            set_perm_over_file(&home_dirr()?.join("obsidian/obs.yaml"))?;
+
+            println!(
+                ">>{} removed [{}]",
+                "obsidian".bright_cyan().bold(),
+                url_app.bright_white().bold()
+            );
+        }
+    }
     Ok(())
 }
 
@@ -343,5 +371,67 @@ fn set_perm_over_file(path: &PathBuf) -> anyhow::Result<()> {
     perm.set_mode(0o600);
 
     fs::set_permissions(&path, perm)?;
+    Ok(())
+}
+
+fn set_perm_over_file_read_only(path: &PathBuf) -> anyhow::Result<()> {
+    let file = fs::File::open(path)?;
+    let mut perm = file.metadata()?.permissions();
+    perm.set_readonly(true);
+
+    fs::set_permissions(&path, perm)?;
+    Ok(())
+}
+
+pub fn search(url_app: &String, ef: Option<&String>) -> anyhow::Result<()> {
+    let read_yaml = read_yaml(ef)?;
+
+    if let Some(ry) = read_yaml.iter().find(|u| u.url_app == *url_app) {
+        println!(
+            ">> {} [{}] [{}]",
+            "found".bright_cyan().bold(),
+            ry.url_app.to_string().bright_white().bold(),
+            ry.data.to_string().bright_white().bold()
+        );
+    }
+    Ok(())
+}
+
+pub fn change(
+    url_app: &String,
+    ef: Option<&String>,
+    master_key: &String,
+    password: &String,
+    username_email: &String,
+) -> anyhow::Result<()> {
+    let password = Zeroizing::new(password.to_string());
+    let master_key = Zeroizing::new(master_key.to_string());
+
+    let mut read_yaml_i = read_yaml(ef)?;
+
+    if let Some(o) = read_yaml_i
+        .iter_mut()
+        .find(|s| s.url_app == url_app.deref())
+    {
+        let enc = enc(&master_key, username_email, &password)?;
+        let enc = BASE64_STANDARD.encode(enc);
+        o.data = enc;
+        let yaml = serde_yaml::to_string(&read_yaml_i)?;
+        if let Some(ef) = ef {
+            fs::write(home_dirr()?.join(ef), &yaml)?;
+            #[cfg(unix)]
+            set_perm_over_file(&home_dirr()?.join(ef))?;
+        } else {
+            fs::write(
+                home_dirr()?
+                    .join("obsidian/obs.yaml")
+                    .to_string_lossy()
+                    .to_string(),
+                &yaml,
+            )?;
+            #[cfg(unix)]
+            set_perm_over_file(&home_dirr()?.join("obsidian/obs.yaml"))?;
+        }
+    }
     Ok(())
 }

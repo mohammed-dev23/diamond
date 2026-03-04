@@ -14,9 +14,10 @@ use crate::{
         parser::{Token, parse_input},
         safe::{
             AnyHowErrHelper, Checkers, FileChecker, MasterKeyV, PasswordChecker, action_password,
+            does_not_e,
         },
     },
-    dec_enc::{add, get, list, remove},
+    dec_enc::{add, change, get, list, remove, search},
 };
 use dec_enc::{_pre_, home_dirr, pre_add};
 
@@ -52,13 +53,13 @@ fn interface() -> anyhow::Result<()> {
                     .checker("master-key".to_string())?
                     .master_key_checker()
                     .pe2()?
-                    .check_password_()
+                    .check_password_(&"master-key".to_string())
                     .pe2();
 
                 let ac_password = data
                     .get_token(5)
                     .checker("action-password".to_string())?
-                    .check_password_()
+                    .check_password_(&"action-password".to_string())
                     .pe();
 
                 let res = if ac_password.is_ok() {
@@ -108,6 +109,17 @@ fn interface() -> anyhow::Result<()> {
                     return Err(anyhow!("missing action-password"));
                 };
 
+                does_not_e(
+                    &url_app
+                        .as_ref()
+                        .map_err(|_| anyhow!("moving url/app error!"))?
+                        .to_string(),
+                    1,
+                    &data,
+                    None,
+                )
+                .pe()?;
+
                 if res.is_ok() {
                     if let (Ok(o), Ok(p)) = (url_app, master_key) {
                         get(o, p, None).pe()?
@@ -120,11 +132,11 @@ fn interface() -> anyhow::Result<()> {
                     "--add" => {
                         println!(
                             ">>{}: [{}] [{}] [{}] [{}] [{}] [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "add".bright_yellow().bold(),
                             "username/email".bright_yellow().bold(),
-                            "passwored".bright_yellow().bold(),
+                            "obsidian".bright_yellow().bold(),
                             "url/app".bright_yellow().bold(),
                             "master-key".bright_yellow().bold(),
                             "add-password".bright_yellow().bold(),
@@ -133,8 +145,8 @@ fn interface() -> anyhow::Result<()> {
                     "--get" => {
                         println!(
                             ">>{}: [{}] [{}] [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "get".bright_yellow().bold(),
                             "url/app".bright_yellow().bold(),
                             "master-key".bright_yellow().bold()
@@ -143,8 +155,8 @@ fn interface() -> anyhow::Result<()> {
                     "--remove" => {
                         println!(
                             ">>{}: [{}] [{}] [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "remove".bright_yellow().bold(),
                             "url/app".bright_yellow().bold(),
                             "action-password".bright_yellow().bold()
@@ -153,29 +165,89 @@ fn interface() -> anyhow::Result<()> {
                     "--list" => {
                         println!(
                             ">>{}: [{}] [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "list".bright_yellow().bold(),
                             "action-password".bright_yellow().bold()
+                        );
+                    }
+                    "--search" => {
+                        println!(
+                            ">>{}: [{}] [{}] [{}] [{}]",
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
+                            "search".bright_yellow().bold(),
+                            "url/app".bright_yellow().bold(),
+                            "action-password".bright_yellow().bold(),
+                        );
+                    }
+                    "--change" => {
+                        println!(
+                            ">>{}: [{}] [{}] [{}] [{}] [{}] [{}] [{}]",
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
+                            "change".bright_yellow().bold(),
+                            "url/app".bright_yellow().bold(),
+                            "username/email".bright_yellow().bold(),
+                            "password".bright_yellow().bold(),
+                            "master-key".bright_yellow().bold(),
+                            "action-password".bright_yellow().bold(),
                         );
                     }
                     "--clear" => {
                         println!(
                             ">>{}: [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "clear".bright_yellow().bold(),
                         );
                     }
                     "--exit" => {
                         println!(
                             ">>{}: [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "exit".bright_yellow().bold(),
                         );
                     }
+                    "-l" => {
+                        println!(
+                            ">>[{}] --[{}]",
+                            "help".bright_purple().bold(),
+                            "add/get/remove/search/clear/exit/list/change"
+                                .bright_yellow()
+                                .bold()
+                        );
+
+                        println!(
+                            ">> <{}: used to add passwords and so on> / <{}: used to get data>",
+                            "add".bright_purple().bold(),
+                            "get".bright_purple().bold()
+                        );
+                        println!(
+                            ">> <{}: used to remove data from the file> / <{}: used to search for data by there url/app name>",
+                            "remove".bright_purple().bold(),
+                            "search".bright_purple().bold()
+                        );
+                        println!(
+                            ">> <{}: used to clear the term> / <{}: used to exit the program>",
+                            "clear".bright_purple().bold(),
+                            "exit".bright_purple().bold()
+                        );
+                        println!(
+                            ">> <{}: used to list all the data> / <{}: used to change data using there url/app name>",
+                            "list".bright_purple().bold(),
+                            "change".bright_purple().bold()
+                        );
+                    }
                     _ => {
+                        if !data.get_token(1)?.is_empty() {
+                            println!(
+                                ">> The flag [{}] you used is not vaild flag please use [{} -l] to check all the available flags",
+                                data.get_token(1)?.bright_red().bold(),
+                                "help".bright_yellow().bold()
+                            )
+                        }
                         continue;
                     }
                 }
@@ -201,7 +273,7 @@ fn interface() -> anyhow::Result<()> {
                 let url_app = data.get_token(1).checker("url/app".to_string()).pe();
                 let ac_password = data
                     .get_token(2)
-                    .checker("action_password".to_string())
+                    .checker("action password".to_string())
                     .pe();
 
                 let res = if ac_password.is_ok() {
@@ -210,9 +282,96 @@ fn interface() -> anyhow::Result<()> {
                     return Err(anyhow!("missing action-password"));
                 };
 
+                does_not_e(
+                    &url_app
+                        .as_ref()
+                        .map_err(|_| anyhow!("moving url/app error!"))?
+                        .to_string(),
+                    1,
+                    &data,
+                    None,
+                )
+                .pe()?;
+
                 if res.is_ok() {
                     if let Ok(o) = url_app {
                         remove(&o, None)?;
+                    }
+                }
+            }
+            "search" => {
+                let url_app = data.get_token(1).checker("url/app".to_string()).pe();
+                let ac_password = data
+                    .get_token(2)
+                    .checker("action password".to_string())
+                    .pe();
+
+                let res = if ac_password.is_ok() {
+                    action_password(&ac_password?).pe()
+                } else {
+                    return Err(anyhow!("missing action-password"));
+                };
+
+                does_not_e(
+                    &url_app
+                        .as_ref()
+                        .map_err(|_| anyhow!("moving url/app error!"))?
+                        .to_string(),
+                    1,
+                    &data,
+                    None,
+                )
+                .pe()?;
+
+                if res.is_ok() {
+                    if let Ok(o) = url_app {
+                        search(&o, None).pe()?
+                    }
+                }
+            }
+            "change" => {
+                let url_app = data.get_token(1).checker("url/app".to_string()).pe();
+                let username_email = data.get_token(2).checker("username/email".to_string()).pe();
+                let passwoed = data.get_token(3).checker("password".to_string()).pe();
+                let master_key = data
+                    .get_token(4)
+                    .checker("master-key".to_string())
+                    .pe2()?
+                    .master_key_checker()
+                    .pe2()?
+                    .check_password_(&"master-key".to_string());
+                let ac_password = data
+                    .get_token(5)
+                    .checker("action-password".to_string())
+                    .pe();
+
+                let res = if ac_password.is_ok() {
+                    action_password(&ac_password?)
+                } else {
+                    return Err(anyhow!("missing action-password"));
+                };
+
+                does_not_e(
+                    &url_app
+                        .as_ref()
+                        .map_err(|_| anyhow!("moving url/app error!"))?
+                        .to_string(),
+                    1,
+                    &data,
+                    None,
+                )
+                .pe()?;
+
+                if res.is_ok() {
+                    if let (Ok(ue), Ok(pw), Ok(mk)) = (username_email, passwoed, master_key) {
+                        change(
+                            &data.get_token(1).checker("url/app".to_string())?,
+                            None,
+                            &mk,
+                            &pw,
+                            &ue,
+                        )
+                        .pe()?
                     }
                 }
             }
@@ -226,13 +385,13 @@ fn interface() -> anyhow::Result<()> {
                         .checker("master-key".to_string())?
                         .master_key_checker()
                         .pe2()?
-                        .check_password_()
+                        .check_password_(&"master-key".to_string())
                         .pe2();
 
                     let ac_password = data
                         .get_token(6)
                         .checker("add-password".to_string())?
-                        .check_password_()
+                        .check_password_(&"action-password".to_string())
                         .pe();
 
                     let external_file = data
@@ -290,6 +449,17 @@ fn interface() -> anyhow::Result<()> {
                         return Err(anyhow!("missing action-password"));
                     };
 
+                    does_not_e(
+                        &url_app
+                            .as_ref()
+                            .map_err(|_| anyhow!("moving url/app error!"))?
+                            .to_string(),
+                        1,
+                        &data,
+                        None,
+                    )
+                    .pe()?;
+
                     if res.is_ok() {
                         if let (Ok(o), Ok(p), Ok(ef)) = (url_app, master_key, ef) {
                             get(o, p, Some(&ef)).pe()?
@@ -337,9 +507,109 @@ fn interface() -> anyhow::Result<()> {
                         return Err(anyhow!("missing action-password"));
                     };
 
+                    does_not_e(
+                        &url_app
+                            .as_ref()
+                            .map_err(|_| anyhow!("moving url/app error!"))?
+                            .to_string(),
+                        1,
+                        &data,
+                        None,
+                    )
+                    .pe()?;
+
                     if res.is_ok() {
                         if let (Ok(o), Ok(ef)) = (url_app, ef) {
                             remove(&o, Some(&ef))?;
+                        }
+                    }
+                }
+                "search" => {
+                    let url_app = data.get_token(2).checker("url/app".to_string()).pe();
+                    let ac_password = data
+                        .get_token(3)
+                        .checker("action password".to_string())
+                        .pe();
+
+                    let ef = data
+                        .get_token(4)
+                        .checker("external file/path/name".to_string())
+                        .pe();
+
+                    let res = if ac_password.is_ok() {
+                        action_password(&ac_password?).pe()
+                    } else {
+                        return Err(anyhow!("missing action-password"));
+                    };
+
+                    does_not_e(
+                        &url_app
+                            .as_ref()
+                            .map_err(|_| anyhow!("moving url/app error!"))?
+                            .to_string(),
+                        1,
+                        &data,
+                        None,
+                    )
+                    .pe()?;
+
+                    if res.is_ok() {
+                        if let (Ok(o), Ok(ef)) = (url_app, ef) {
+                            search(&o, Some(&ef)).pe()?
+                        }
+                    }
+                }
+                "change" => {
+                    let url_app = data.get_token(2).checker("url/app".to_string()).pe();
+                    let username_email =
+                        data.get_token(3).checker("username/email".to_string()).pe();
+                    let passwoed = data.get_token(4).checker("password".to_string()).pe();
+                    let master_key = data
+                        .get_token(5)
+                        .checker("master-key".to_string())
+                        .pe2()?
+                        .master_key_checker()
+                        .pe2()?
+                        .check_password_(&"master-key".to_string());
+                    let ac_password = data
+                        .get_token(6)
+                        .checker("action-password".to_string())
+                        .pe();
+
+                    let res = if ac_password.is_ok() {
+                        action_password(&ac_password?)
+                    } else {
+                        return Err(anyhow!("missing action-password"));
+                    };
+
+                    does_not_e(
+                        &url_app
+                            .as_ref()
+                            .map_err(|_| anyhow!("moving url/app error!"))?
+                            .to_string(),
+                        1,
+                        &data,
+                        None,
+                    )
+                    .pe()?;
+
+                    let ef = data
+                        .get_token(7)
+                        .checker("external file/path/name".to_string())
+                        .pe();
+
+                    if res.is_ok() {
+                        if let (Ok(ue), Ok(pw), Ok(mk), Ok(ef)) =
+                            (username_email, passwoed, master_key, ef)
+                        {
+                            change(
+                                &data.get_token(2).checker("url/app".to_string())?,
+                                Some(&ef),
+                                &mk,
+                                &pw,
+                                &ue,
+                            )
+                            .pe()?
                         }
                     }
                 }
@@ -347,12 +617,12 @@ fn interface() -> anyhow::Result<()> {
                     "--add" => {
                         println!(
                             ">>{}: [{}] [{}] [{}] [{}] [{}] [{}] [{}] [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "external".bright_yellow().bold(),
                             "add".bright_yellow().bold(),
                             "username/email".bright_yellow().bold(),
-                            "passwored".bright_yellow().bold(),
+                            "obsidian".bright_yellow().bold(),
                             "url/app".bright_yellow().bold(),
                             "master-key".bright_yellow().bold(),
                             "add-password".bright_yellow().bold(),
@@ -362,8 +632,8 @@ fn interface() -> anyhow::Result<()> {
                     "--get" => {
                         println!(
                             ">>{}: [{}] [{}] [{}] [{}] [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "external".bright_yellow().bold(),
                             "get".bright_yellow().bold(),
                             "url/app".bright_yellow().bold(),
@@ -374,8 +644,8 @@ fn interface() -> anyhow::Result<()> {
                     "--remove" => {
                         println!(
                             ">>{}: [{}] [{}] [{}] [{}] [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "external".bright_yellow().bold(),
                             "remove".bright_yellow().bold(),
                             "url/app".bright_yellow().bold(),
@@ -386,18 +656,89 @@ fn interface() -> anyhow::Result<()> {
                     "--list" => {
                         println!(
                             ">>{}: [{}] [{}] [{}] [{}] [{}]",
-                            "Usge".bright_green().bold(),
-                            "obsidan".bright_blue().bold(),
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
                             "external".bright_yellow().bold(),
                             "list".bright_yellow().bold(),
                             "action-password".bright_yellow().bold(),
                             "path/name".bright_yellow().bold()
                         );
                     }
-                    _ => continue,
+                    "--search" => {
+                        println!(
+                            ">>{}: [{}] [{}] [{}] [{}] [{}] [{}]",
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
+                            "external".bright_yellow().bold(),
+                            "search".bright_yellow().bold(),
+                            "url/app".bright_yellow().bold(),
+                            "action-password".bright_yellow().bold(),
+                            "path/name".bright_yellow().bold()
+                        );
+                    }
+                    "--change" => {
+                        println!(
+                            ">>{}: [{}] [{}] [{}] [{}] [{}] [{}] [{}] [{}] [{}]",
+                            "Usage".bright_green().bold(),
+                            "obsidian".bright_blue().bold(),
+                            "external".bright_yellow().bold(),
+                            "change".bright_yellow().bold(),
+                            "url/app".bright_yellow().bold(),
+                            "username/email".bright_yellow().bold(),
+                            "password".bright_yellow().bold(),
+                            "master-key".bright_yellow().bold(),
+                            "action-password".bright_yellow().bold(),
+                            "path/name".bright_yellow().bold(),
+                        );
+                    }
+                    "-l" => {
+                        println!(
+                            ">>[{}] --[{}]",
+                            "help".bright_purple().bold(),
+                            "add/get/remove/search/clear/exit/list/change"
+                                .bright_yellow()
+                                .bold()
+                        );
+                        println!(
+                            ">> <{}: used to add passwords and so on> / <{}: used to get data>",
+                            "add".bright_purple().bold(),
+                            "get".bright_purple().bold()
+                        );
+                        println!(
+                            ">> <{}: used to remove data from the file> / <{}: used to search for data by there url/app name>",
+                            "remove".bright_purple().bold(),
+                            "search".bright_purple().bold()
+                        );
+                        println!(
+                            ">> <{}: used to clear the term> / <{}: used to exit the program>",
+                            "clear".bright_purple().bold(),
+                            "exit".bright_purple().bold()
+                        );
+                        println!(
+                            ">> <{}: used to list all the data> / <{}: used to change data using there url/app name>",
+                            "list".bright_purple().bold(),
+                            "change".bright_purple().bold()
+                        );
+                    }
+                    _ => {
+                        if !data.get_token(2)?.is_empty() {
+                            println!(
+                                ">> The flag [{}] you used is not vaild flag please use [{} -l] to check all the available flags",
+                                data.get_token(2)?.bright_red().bold(),
+                                "help".bright_yellow().bold()
+                            )
+                        }
+                        continue;
+                    }
                 },
                 _ => {
-                    continue;
+                    if !data.get_token(1)?.is_empty() {
+                        println!(
+                            ">> The command [{}] you used is not vaild command please use [{}] to check all the available commands",
+                            data.get_token(1)?.bright_red().bold(),
+                            "help".bright_yellow().bold()
+                        )
+                    }
                 }
             },
             "exit" => {
@@ -409,7 +750,13 @@ fn interface() -> anyhow::Result<()> {
                 continue;
             }
             _ => {
-                continue;
+                if !data.get_token(0)?.is_empty() {
+                    println!(
+                        ">> The command [{}] you used is not vaild command please use [{} -l] to check all the available commands",
+                        data.get_token(0)?.bright_red().bold(),
+                        "help".bright_yellow().bold()
+                    )
+                }
             }
         }
         return Ok(());
