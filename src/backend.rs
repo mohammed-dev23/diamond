@@ -192,7 +192,7 @@ pub mod safe {
                 Score::Two => PasswordCheckerT::Fair(pwd),
                 Score::Three => PasswordCheckerT::Good(pwd),
                 Score::Four => PasswordCheckerT::Strong(pwd),
-                _ => PasswordCheckerT::Strong(pwd),
+                _ => unreachable!(),
             };
 
             if sc == PasswordCheckerT::VeryWeak(pwd) || sc == PasswordCheckerT::Weak(pwd) {
