@@ -1,4 +1,4 @@
-# Obsidian
+# Diamond
 
 A secure, REPL based password manager built in Rust with military-grade encryption.
 
@@ -14,7 +14,7 @@ A secure, REPL based password manager built in Rust with military-grade encrypti
 
 ## Security
 
-Obsidian uses industry-standard cryptography:
+diamond uses industry-standard cryptography:
 
 - **Encryption**: AES-256-GCM with random nonce per entry
 - **Key Derivation**: Argon2 with random 16-byte salt
@@ -26,36 +26,36 @@ All passwords are encrypted before storage. The master key never touches disk in
 ## Installation
 
 ```bash
-git clone https://github.com/mohammed-dev23/obsidian.git
-cd obsidian
+git clone https://github.com/mohammed-dev23/diamond.git
+cd diamond
 cargo run
 ```
 
-The binary will be in `/obsidian`.
+The binary will be in `/diamond`.
 
 ## Usage
 
 Launch the REPL:
 
 ```bash
-./obsidian or cargo run
+./diamond or cargo run
 ```
 
 ### Commands
 
 #### Add a password
 ```
-add <username/email> <password> <id> <master-key> <action-key>
+add <username/email> <password> <id> <master-key> 
 ```
 
 Example:
 ```
-add user@example.com MyP@ssw0rd github MyMasterKey123456 MyActionPass123
+add user@example.com MyP@ssw0rd github MyMasterKey123456
 ```
 
 #### Get a password
 ```
-get <id> <master-key> <action-key>
+get <id> <master-key> 
 ```
 
 Example:
@@ -65,22 +65,17 @@ get github MyMasterKey123456 MyActionPass123
 
 #### List all entries
 ```
-list <action-key>
+list 
 ```
 
 #### Search for an entry
 ```
-search <id> <action-key>
-```
-
-#### Change an entry
-```
-change <id> <username/email> <new-password> <master-key> <action-key>
+search <id> 
 ```
 
 #### Remove an entry
 ```
-remove <id> <action-key>
+remove <id> <master-key>
 ```
 
 #### Generate a password
@@ -125,14 +120,14 @@ external work.json list MyAction123
 - **Action Password**: Must pass strength validation
 - **Regular Passwords**: Strength validated against username/email context
 
-Passwords are rated as: Very Weak, Weak, Fair, Good, or Strong. Obsidian rejects Very Weak and Weak passwords.
+Passwords are rated as: Very Weak, Weak, Fair, Good, or Strong. diamond rejects Very Weak and Weak passwords.
 
 ## File Storage
 
-Default location: `~/obsidian/`
+Default location: `~/diamond/`
 
-- `obs.json` - Encrypted password database
-- `obs_password.txt` - Hashed action password
+- `gem.json` - Encrypted password database
+- `gem_password.txt` - Hashed action password
 
 External vaults are stored at the specified path relative to `~`.
 

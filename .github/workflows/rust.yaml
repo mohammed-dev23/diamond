@@ -9,7 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-jobs:
+jgem:
   build:
 
     runs-on: ubuntu-latest

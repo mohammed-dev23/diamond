@@ -1,15 +1,11 @@
 pub mod safe {
     use core::fmt;
-    use std::{fs, ops::Deref};
 
     use anyhow::anyhow;
     use colored::Colorize;
     use zxcvbn::Score;
 
-    use crate::{
-        backend::parser::Token,
-        dec_enc::{action_pass_maker, action_pass_val, home_dirr, read_json},
-    };
+    use crate::{backend::parser::Token, crypto::read_json};
 
     pub trait Checkers {
         type Out;
@@ -26,7 +22,7 @@ pub mod safe {
     pub trait FileChecker {
         type Out;
 
-        fn check_existing_ids(self, id: &str, ef: Option<&String>) -> Self::Out;
+        fn check_existing_ids(self, id: &str, ef: Option<&str>) -> Self::Out;
     }
 
     pub trait AnyHowErrHelper {
@@ -60,13 +56,13 @@ pub mod safe {
     impl FileChecker for String {
         type Out = anyhow::Result<String>;
 
-        fn check_existing_ids(self, id: &str, ef: Option<&String>) -> Self::Out {
+        fn check_existing_ids(self, id: &str, ef: Option<&str>) -> Self::Out {
             let read_json = read_json(ef)?;
 
-            if let Some(o) = read_json.iter().find(|s| s.id == id) {
+            if let Some(o) = read_json.iter().find(|s| s.entry.id == id) {
                 return Err(anyhow!(
                     "the id does already exist try another one or add special symbols beside it ! <{}>",
-                    o.id.to_string().bright_yellow().bold()
+                    o.entry.id.to_string().bright_yellow().bold()
                 ));
             } else {
                 return Ok(self);
@@ -86,24 +82,6 @@ pub mod safe {
             self
         }
     }
-
-    pub fn action_password(ac_pass: &str) -> anyhow::Result<()> {
-        let res = if fs::File::open(
-            home_dirr()?
-                .join("obsidian/obs_password.txt")
-                .to_string_lossy()
-                .to_string(),
-        )
-        .is_err()
-        {
-            action_pass_maker(ac_pass)
-        } else {
-            action_pass_val(ac_pass)
-        };
-
-        res
-    }
-
     #[derive(PartialEq, Debug)]
     pub enum PasswordCheckerT<'s> {
         VeryWeak(&'s String),
@@ -164,25 +142,27 @@ pub mod safe {
         type Out;
 
         fn check_password_(
-            &self,
+            self,
             pwd: &String,
-            context: anyhow::Result<&String, &anyhow::Error>,
+            context: &anyhow::Result<&str, anyhow::Error>,
         ) -> Self::Out;
     }
 
-    impl PasswordChecker for String {
+    impl PasswordChecker for anyhow::Result<String> {
         type Out = anyhow::Result<String>;
 
         fn check_password_(
-            &self,
+            self,
             pwd: &String,
-            context: anyhow::Result<&String, &anyhow::Error>,
+            context: &anyhow::Result<&str, anyhow::Error>,
         ) -> Self::Out {
+            let sself = self?;
+
             let score = zxcvbn::zxcvbn(
-                &self,
+                &sself,
                 &[context
-                    .map_err(|_| anyhow!("missing username/email"))?
-                    .as_str()],
+                    .as_ref()
+                    .map_err(|_| anyhow!("missing username/email"))?],
             )
             .score();
 
@@ -199,18 +179,17 @@ pub mod safe {
                 return Err(anyhow!("{}", sc));
             }
             println!(">>{}", sc);
-            return Ok(self.to_string());
+            return Ok(sself);
         }
     }
 
-    pub fn does_not_e(
-        id: &String,
+    pub fn id_does_not_exsist(
+        id: &str,
         token: usize,
         data: &Vec<String>,
-        ef: Option<&String>,
+        ef: Option<&str>,
     ) -> anyhow::Result<()> {
         if id
-            .deref()
             .to_string()
             .check_existing_ids(&*data.get_token(&token)?, ef)
             .is_ok()
@@ -230,17 +209,17 @@ pub mod parser {
     }
 
     pub trait Token {
-        fn get_token(&self, index: &usize) -> anyhow::Result<String>;
+        fn get_token(&self, index: &usize) -> anyhow::Result<&str>;
     }
 
     impl Token for Vec<String> {
-        fn get_token(&self, index: &usize) -> anyhow::Result<String> {
+        fn get_token(&self, index: &usize) -> anyhow::Result<&str> {
             if self.is_empty() && *index == 0 {
-                return Ok(String::new());
+                return Ok("");
             }
 
             if let Some(d) = self.get(*index) {
-                return Ok(d.to_string());
+                return Ok(d.as_str());
             } else {
                 return Err(anyhow!("Couldn't get data from the parser!"));
             }
