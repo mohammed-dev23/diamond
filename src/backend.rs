@@ -13,7 +13,7 @@ pub mod safe {
         fn checker(self, res: String) -> Self::Out;
     }
 
-    pub trait MasterKeyV {
+    pub trait MasterKey {
         type Out;
 
         fn master_key_checker(self) -> Self::Out;
@@ -41,7 +41,7 @@ pub mod safe {
         }
     }
 
-    impl MasterKeyV for String {
+    impl MasterKey for String {
         type Out = anyhow::Result<String>;
 
         fn master_key_checker(self) -> Self::Out {
@@ -84,11 +84,11 @@ pub mod safe {
     }
     #[derive(PartialEq, Debug)]
     pub enum PasswordCheckerT<'s> {
-        VeryWeak(&'s String),
-        Weak(&'s String),
-        Fair(&'s String),
-        Good(&'s String),
-        Strong(&'s String),
+        VeryWeak(&'s str),
+        Weak(&'s str),
+        Fair(&'s str),
+        Good(&'s str),
+        Strong(&'s str),
     }
 
     impl fmt::Display for PasswordCheckerT<'_> {
@@ -141,30 +141,16 @@ pub mod safe {
     pub trait PasswordChecker {
         type Out;
 
-        fn check_password_(
-            self,
-            pwd: &String,
-            context: &anyhow::Result<&str, anyhow::Error>,
-        ) -> Self::Out;
+        fn check_password_strength(self, pwd: &str, context: &str) -> Self::Out;
     }
 
     impl PasswordChecker for anyhow::Result<String> {
         type Out = anyhow::Result<String>;
 
-        fn check_password_(
-            self,
-            pwd: &String,
-            context: &anyhow::Result<&str, anyhow::Error>,
-        ) -> Self::Out {
+        fn check_password_strength(self, pwd: &str, context: &str) -> Self::Out {
             let sself = self?;
 
-            let score = zxcvbn::zxcvbn(
-                &sself,
-                &[context
-                    .as_ref()
-                    .map_err(|_| anyhow!("missing username/email"))?],
-            )
-            .score();
+            let score = zxcvbn::zxcvbn(&sself, &[context]).score();
 
             let sc = match score {
                 Score::Zero => PasswordCheckerT::VeryWeak(pwd),
@@ -175,7 +161,10 @@ pub mod safe {
                 _ => unreachable!(),
             };
 
-            if sc == PasswordCheckerT::VeryWeak(pwd) || sc == PasswordCheckerT::Weak(pwd) {
+            if sc == PasswordCheckerT::VeryWeak(pwd)
+                || sc == PasswordCheckerT::Weak(pwd)
+                || sc == PasswordCheckerT::Fair(pwd)
+            {
                 return Err(anyhow!("{}", sc));
             }
             println!(">>{}", sc);
@@ -208,6 +197,44 @@ pub mod parser {
         return Ok(data);
     }
 
+    pub fn parse_input_by_token(data: String) -> anyhow::Result<Vec<String>> {
+        let mut content_in = String::new();
+        let mut _in_ = false;
+        let mut vec = Vec::new();
+
+        for i in data.chars() {
+            match i {
+                '<' => {
+                    if !content_in.trim().is_empty() {
+                        vec.push(content_in.trim().to_string());
+                    }
+                    _in_ = true;
+                    content_in.clear();
+                }
+                '>' => {
+                    if _in_ == true {
+                        vec.push(content_in.trim().to_string());
+                        content_in.clear();
+                        _in_ = false;
+                    }
+                }
+                _ => {
+                    if _in_ == true {
+                        content_in.push(i);
+                    } else if i.is_whitespace() {
+                        if !content_in.trim().is_empty() {
+                            vec.push(content_in.trim().to_string());
+                            content_in.clear();
+                        }
+                    } else {
+                        content_in.push(i);
+                    }
+                }
+            }
+        }
+        Ok(vec)
+    }
+
     pub trait Token {
         fn get_token(&self, index: &usize) -> anyhow::Result<&str>;
     }
@@ -223,6 +250,16 @@ pub mod parser {
             } else {
                 return Err(anyhow!("Couldn't get data from the parser!"));
             }
+        }
+    }
+}
+
+pub mod cleaner {
+    pub fn extract_string_value_from_result(value: &anyhow::Result<&str>) -> String {
+        if let Ok(o) = value {
+            return o.to_string();
+        } else {
+            return String::new();
         }
     }
 }

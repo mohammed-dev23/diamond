@@ -15,7 +15,9 @@ pub struct Customization {
     pub username: String,
 }
 #[derive(Serialize, Deserialize)]
-pub struct Dependencies {}
+pub struct Dependencies {
+    pub main_vault_path: String,
+}
 
 pub fn toml() -> anyhow::Result<Toml> {
     let mut readed_toml = String::new();
@@ -32,10 +34,11 @@ pub fn toml() -> anyhow::Result<Toml> {
 
 pub fn toml_init() -> anyhow::Result<()> {
     let username = "def".to_string();
+    let main_vault_path = home_dirr()?.join("diamond").to_string_lossy().to_string();
 
     let def_toml = Toml {
         customization: Customization { username: username },
-        dependencies: Dependencies {},
+        dependencies: Dependencies { main_vault_path },
     };
 
     let make_data = toml::to_string(&def_toml)?;

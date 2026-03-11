@@ -337,6 +337,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "base64",
+ "chrono",
  "colored",
  "rand",
  "rpassword",

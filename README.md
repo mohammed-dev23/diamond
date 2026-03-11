@@ -45,12 +45,13 @@ Launch the REPL:
 
 #### Add a password
 ```
-add <username/email> <password> <id> <master-key> 
+add <username/email> <password> <id> <master-key> <<Option: note>> 
 ```
 
 Example:
 ```
 add user@example.com MyP@ssw0rd github MyMasterKey123456
+add user@example.com MyP@ssw0rd github MyMasterKey123456 <note>
 ```
 
 #### Get a password
@@ -60,7 +61,7 @@ get <id> <master-key>
 
 Example:
 ```
-get github MyMasterKey123456 MyActionPass123
+get github MyMasterKey123456
 ```
 
 #### List all entries
@@ -109,49 +110,36 @@ external <path/file> <command> [arguments...]
 
 Example:
 ```
-external work.json add user@work.com P@ss123 slack MyKey123456 MyAction123
-external work.json get slack MyKey123456 MyAction123
-external work.json list MyAction123
+external work.json add user@work.com P@ss123 slack MyKey123456
+external work.json get slack MyKey123456 
+external work.json list
 ```
 
 ## Password Requirements
 
 - **Master Key**: Minimum 16 characters, must pass strength validation
-- **Action Password**: Must pass strength validation
 - **Regular Passwords**: Strength validated against username/email context
 
-Passwords are rated as: Very Weak, Weak, Fair, Good, or Strong. diamond rejects Very Weak and Weak passwords.
+Passwords are rated as: Very Weak, Weak, Fair, Good, or Strong. diamond rejects Very Weak and Weak and Fair passwords.
 
 ## File Storage
 
 Default location: `~/diamond/`
 
 - `gem.json` - Encrypted password database
-- `gem_password.txt` - Hashed action password
+- `gem.toml` - Config file
 
 External vaults are stored at the specified path relative to `~`.
 
 Each entry stores:
 - `id`: id identifier
-- `data`: Base64-encoded encrypted blob containing username/email and password
+- `salt` : the salt used in encrypting
+- `nonce`: the nonce used in encryptinh
+- `note`: a note
+- `date`: the date of creation
+- `data`: Base64-encoded encrypted blob containing username/email/etc.. and password
 
 ## Building from Source
-
-### Dependencies
-
-```toml
-aes-gcm = "0.10"
-argon2 = "0.5"
-anyhow = "1.0"
-base64 = "0.22"
-colored = "2.1"
-rand = "0.8"
-rustyline = "14.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-zeroize = "1.8"
-zxcvbn = "3.1"
-```
 
 ### Build
 
@@ -169,11 +157,9 @@ cargo test
 
 ⚠️ **Important**:
 
-- Never share your master key or action password
-- The action password protects against unauthorized REPL commands
+- Never share your master key
 - The master key encrypts/decrypts your passwords
-- Both are required and independently validated
-- Loss of either password means permanent data loss (no recovery mechanism)
+- Loss of master-key means permanent data loss
 - Store vault backups securely
 
 ## Platform Support

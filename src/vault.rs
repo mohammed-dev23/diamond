@@ -39,7 +39,9 @@ pub fn home_dirr() -> anyhow::Result<PathBuf> {
 
 pub fn print_mini_logo() {
     use colored::Colorize;
-    println!("{}", r#"
+    println!(
+        "{}",
+        r#"
        ╱╲
       ╱  ╲    D I A M O N D
      ╱ ╱╲ ╲   
@@ -48,5 +50,7 @@ pub fn print_mini_logo() {
      ╲ ╲╱ ╱
       ╲  ╱
        ╲╱
-    "#.bright_cyan());
+    "#
+        .bright_cyan()
+    );
 }

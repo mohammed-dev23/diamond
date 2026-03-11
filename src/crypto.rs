@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use base64::prelude::*;
-use std::{fs, io::Read};
+use std::{fs, io::Read, path::PathBuf};
 use zeroize::Zeroizing;
 
 use aes_gcm::{
@@ -10,7 +10,7 @@ use aes_gcm::{
 use argon2::Argon2;
 use serde::{Deserialize, Serialize};
 
-use crate::vault::home_dirr;
+use crate::{toml::toml, vault::home_dirr};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Fields {
@@ -23,18 +23,29 @@ pub struct Entry {
     pub salt: String,
     pub nonce: String,
     pub data: String,
+    pub note: Option<String>,
+    pub date: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VaultExport {
+    pub salt: String,
+    pub nonce: String,
+    pub vault: String,
 }
 
 pub fn read_json(ef: Option<&str>) -> anyhow::Result<Vec<Fields>> {
     let mut s = String::new();
+
+    let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
 
     let mut o = if let Some(ef) = ef {
         let o = fs::File::open(home_dirr()?.join(ef))?;
         o
     } else {
         let o = fs::File::open(
-            home_dirr()?
-                .join("diamond/gem.json")
+            main_vault_path
+                .join("gem.json")
                 .to_string_lossy()
                 .to_string(),
         )?;
@@ -105,7 +116,31 @@ pub fn dec(master_key: &str, id: &str, ef: Option<&str>) -> anyhow::Result<Vec<u
 
     let dec = cip
         .decrypt(nonce, data.as_ref())
-        .map_err(|_| anyhow!("Couldn't dec data"))?;
+        .map_err(|_| anyhow!("Couldn't dec data | try again with the correct master-key!"))?;
 
     Ok(dec)
+}
+
+pub fn enc_vault(
+    master_key: &str,
+    _vault_: String,
+) -> anyhow::Result<([u8; 16], [u8; 12], Vec<u8>)> {
+    let mut salt = [0u8; 16];
+    OsRng.fill_bytes(&mut salt);
+    let argon2 = Argon2::default();
+    let mut out_master = Zeroizing::new([0u8; 32]);
+
+    argon2
+        .hash_password_into(master_key.as_bytes(), &salt, &mut *out_master)
+        .map_err(|_| anyhow!("Couldn't hash master key"))?;
+
+    let key = Key::<Aes256Gcm>::from_slice(&*out_master);
+    let cip = Aes256Gcm::new(&key);
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+
+    let enc = cip
+        .encrypt(&nonce, _vault_.as_bytes())
+        .map_err(|_| anyhow!("Couldn't enc data"))?;
+
+    Ok((salt, nonce.into(), enc))
 }

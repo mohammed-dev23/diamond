@@ -11,13 +11,13 @@ use rustyline::{DefaultEditor, error::ReadlineError};
 
 use crate::{
     backend::{
-        parser::{Token, parse_input},
+        parser::{Token, parse_input, parse_input_by_token},
         safe::{AnyHowErrHelper, Checkers},
     },
     commands::{generate_password, list},
-    helpers::{add_helper, get_helper, help_helper_1, remove_helper, search_helper},
+    helpers::{add_helper, export_helper, get_helper, help_helper_1, remove_helper, search_helper},
     toml::toml,
-    vault::{_init_ , print_mini_logo},
+    vault::{_init_, print_mini_logo},
 };
 
 fn main() -> anyhow::Result<()> {
@@ -37,7 +37,7 @@ fn interface() -> anyhow::Result<()> {
 
     let format = format!("[diamond][{}]~>", username);
 
-    let data = match rl.readline(&format) {
+    let input = match rl.readline(&format) {
         Ok(o) => o,
         Err(e) => match e {
             ReadlineError::Eof => Err(anyhow!("Eof/ Ctrl+C"))?,
@@ -45,10 +45,12 @@ fn interface() -> anyhow::Result<()> {
         },
     };
 
-    let data = parse_input(data)?;
+    let data = parse_input(input.trim().to_string())?;
+    let data_token = parse_input_by_token(input.trim().to_string())?;
+
     match data.get_token(&0)?.trim() {
         "add" => {
-            add_helper(None, 1, &data)?;
+            add_helper(None, 1, &data, &data_token)?;
         }
         "get" => {
             get_helper(None, 1, &data, 1)?;
@@ -57,7 +59,7 @@ fn interface() -> anyhow::Result<()> {
         "help" => match data.get_token(&1)?.trim() {
             "--add" => {
                 println!(
-                    ">>{}: [{}] [{}] [{}] [{}] [{}] [{}]",
+                    ">>{}: [{}] [{}] [{}] [{}] [{}] [{}] [<{}>]",
                     "Usage".bright_green().bold(),
                     "diamond".bright_blue().bold(),
                     "add".bright_yellow().bold(),
@@ -65,6 +67,7 @@ fn interface() -> anyhow::Result<()> {
                     "password".bright_yellow().bold(),
                     "id".bright_yellow().bold(),
                     "master-key".bright_yellow().bold(),
+                    "Option: note".bright_yellow().bold(),
                 );
             }
             "--get" => {
@@ -120,6 +123,16 @@ fn interface() -> anyhow::Result<()> {
                     "exit".bright_yellow().bold(),
                 );
             }
+            "--export" => {
+                println!(
+                    ">>{}: [{}] [{}] [{}] [{}]",
+                    "Usage".bright_green().bold(),
+                    "diamond".bright_blue().bold(),
+                    "export".bright_yellow().bold(),
+                    "(name of expoert).json".bright_yellow().bold(),
+                    "master-key".bright_yellow().bold()
+                );
+            }
             "-l" => {
                 help_helper_1()?;
             }
@@ -140,6 +153,9 @@ fn interface() -> anyhow::Result<()> {
         "search" => {
             search_helper(None, 1, &data, 1)?;
         }
+        "export" => {
+            export_helper(&data, None, 1)?;
+        }
         "external" => match data.get_token(&2)?.trim() {
             "add" => {
                 let ef = data
@@ -148,7 +164,7 @@ fn interface() -> anyhow::Result<()> {
                     .pe();
 
                 if let Ok(ef) = ef {
-                    add_helper(Some(&ef.to_string()), 3, &data)?;
+                    add_helper(Some(&ef.to_string()), 3, &data, &data_token).pe()?;
                 }
             }
             "get" => {
@@ -191,10 +207,20 @@ fn interface() -> anyhow::Result<()> {
                     search_helper(Some(&ef.to_string()), 3, &data, 2)?;
                 }
             }
+            "export" => {
+                let ef = data
+                    .get_token(&1)
+                    .checker("external file/path".to_string())
+                    .pe();
+
+                if let Ok(ef) = ef {
+                    export_helper(&data, Some(ef), 3)?;
+                } 
+            }
             "help" => match data.get_token(&3)?.trim() {
                 "--add" => {
                     println!(
-                        ">>{}: [{}] [{}] [{}] [{}] [{}] [{}] [{}] [{}]",
+                        ">>{}: [{}] [{}] [{}] [{}] [{}] [{}] [{}] [{}] [<{}>]",
                         "Usage".bright_green().bold(),
                         "diamond".bright_blue().bold(),
                         "external".bright_yellow().bold(),
@@ -204,6 +230,7 @@ fn interface() -> anyhow::Result<()> {
                         "password".bright_yellow().bold(),
                         "id".bright_yellow().bold(),
                         "master-key".bright_yellow().bold(),
+                        "Option: note".bright_yellow().bold(),
                     );
                 }
                 "--get" => {
@@ -250,6 +277,18 @@ fn interface() -> anyhow::Result<()> {
                         "search".bright_yellow().bold(),
                         "id".bright_yellow().bold(),
                     );
+                }
+                "--export" => {
+                    println!(
+                        ">>{}: [{}] [{}] [{}] [{}] [{}] [{}]",
+                        "Usage".bright_green().bold(),
+                        "diamond".bright_blue().bold(),
+                        "external".bright_yellow().bold(),
+                        "path/name".bright_yellow().bold(),
+                        "export".bright_yellow().bold(),
+                        "(name of expoert).json".bright_yellow().bold(),
+                        "master-key".bright_yellow().bold(),
+                    )
                 }
                 "-l" => {
                     help_helper_1()?;
