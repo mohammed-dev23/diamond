@@ -16,7 +16,8 @@ use crate::{
     },
     commands::{generate_password, list},
     helpers::{
-        add_helper, export_helper, get_helper, help_helper,import_helper, remove_helper, search_helper
+        add_helper, export_helper, get_helper, help_helper, import_helper, remove_helper,
+        search_helper,
     },
     toml::toml,
     vault::{_init_, print_mini_logo},

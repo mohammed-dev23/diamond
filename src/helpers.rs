@@ -263,103 +263,103 @@ pub fn help_helper_() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn help_helper (data: &Vec<String> , index:usize) -> anyhow::Result<()> {
+pub fn help_helper(data: &Vec<String>, index: usize) -> anyhow::Result<()> {
     use colored::Colorize;
     match data.get_token(&index)?.trim() {
         "--add" => {
+            println!(
+                ">>{}: [{}] [{}] [{}] [{}] [{}] [{}] [<{}>] [<{}>]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "add".bright_yellow().bold(),
+                "username/email".bright_yellow().bold(),
+                "password".bright_yellow().bold(),
+                "id".bright_yellow().bold(),
+                "master-key".bright_yellow().bold(),
+                "Option: note".bright_yellow().bold(),
+                "Option: external path".bright_yellow().bold(),
+            );
+        }
+        "--get" => {
+            println!(
+                ">>{}: [{}] [{}] [{}] [{}] [<{}>]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "get".bright_yellow().bold(),
+                "id".bright_yellow().bold(),
+                "master-key".bright_yellow().bold(),
+                "Option: external path".bright_yellow().bold(),
+            );
+        }
+        "--remove" => {
+            println!(
+                ">>{}: [{}] [{}] [{}] [{}] [<{}>]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "remove".bright_yellow().bold(),
+                "id".bright_yellow().bold(),
+                "master-key".bright_yellow().bold(),
+                "Option: external path".bright_yellow().bold()
+            );
+        }
+        "--list" => {
+            println!(
+                ">>{}: [{}] [{}] [<{}>]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "list".bright_yellow().bold(),
+                "Option: external path".bright_yellow().bold(),
+            );
+        }
+        "--search" => {
+            println!(
+                ">>{}: [{}] [{}] [{}] [<{}>]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "search".bright_yellow().bold(),
+                "id".bright_yellow().bold(),
+                "Option: external path".bright_yellow().bold(),
+            );
+        }
+        "--clear" => {
+            println!(
+                ">>{}: [{}] [{}]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "clear".bright_yellow().bold(),
+            );
+        }
+        "--exit" => {
+            println!(
+                ">>{}: [{}] [{}]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "exit".bright_yellow().bold(),
+            );
+        }
+        "--export" => {
+            println!(
+                ">>{}: [{}] [{}] [{}] [{}] [{}]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "export".bright_yellow().bold(),
+                "(name of expoert).json".bright_yellow().bold(),
+                "master-key".bright_yellow().bold(),
+                "Option: external path".bright_yellow().bold(),
+            );
+        }
+        "-l" => {
+            help_helper_()?;
+        }
+        _ => {
+            if !data.get_token(&1)?.is_empty() {
                 println!(
-                    ">>{}: [{}] [{}] [{}] [{}] [{}] [{}] [<{}>] [<{}>]",
-                    "Usage".bright_green().bold(),
-                    "diamond".bright_blue().bold(),
-                    "add".bright_yellow().bold(),
-                    "username/email".bright_yellow().bold(),
-                    "password".bright_yellow().bold(),
-                    "id".bright_yellow().bold(),
-                    "master-key".bright_yellow().bold(),
-                    "Option: note".bright_yellow().bold(),
-                    "Option: external path".bright_yellow().bold(),
-                );
+                    ">> The flag [{}] you used is not vaild flag please use [{} -l] to check all the available flags",
+                    data.get_token(&1)?.bright_red().bold(),
+                    "help".bright_yellow().bold()
+                )
             }
-            "--get" => {
-                println!(
-                    ">>{}: [{}] [{}] [{}] [{}] [<{}>]",
-                    "Usage".bright_green().bold(),
-                    "diamond".bright_blue().bold(),
-                    "get".bright_yellow().bold(),
-                    "id".bright_yellow().bold(),
-                    "master-key".bright_yellow().bold(),
-                    "Option: external path".bright_yellow().bold(),
-                );
-            }
-            "--remove" => {
-                println!(
-                    ">>{}: [{}] [{}] [{}] [{}] [<{}>]",
-                    "Usage".bright_green().bold(),
-                    "diamond".bright_blue().bold(),
-                    "remove".bright_yellow().bold(),
-                    "id".bright_yellow().bold(),
-                    "master-key".bright_yellow().bold(),
-                    "Option: external path".bright_yellow().bold()
-                );
-            }
-            "--list" => {
-                println!(
-                    ">>{}: [{}] [{}] [<{}>]",
-                    "Usage".bright_green().bold(),
-                    "diamond".bright_blue().bold(),
-                    "list".bright_yellow().bold(),
-                    "Option: external path".bright_yellow().bold(),
-                );
-            }
-            "--search" => {
-                println!(
-                    ">>{}: [{}] [{}] [{}] [<{}>]",
-                    "Usage".bright_green().bold(),
-                    "diamond".bright_blue().bold(),
-                    "search".bright_yellow().bold(),
-                    "id".bright_yellow().bold(),
-                    "Option: external path".bright_yellow().bold(),
-                );
-            }
-            "--clear" => {
-                println!(
-                    ">>{}: [{}] [{}]",
-                    "Usage".bright_green().bold(),
-                    "diamond".bright_blue().bold(),
-                    "clear".bright_yellow().bold(),
-                );
-            }
-            "--exit" => {
-                println!(
-                    ">>{}: [{}] [{}]",
-                    "Usage".bright_green().bold(),
-                    "diamond".bright_blue().bold(),
-                    "exit".bright_yellow().bold(),
-                );
-            }
-            "--export" => {
-                println!(
-                    ">>{}: [{}] [{}] [{}] [{}] [{}]",
-                    "Usage".bright_green().bold(),
-                    "diamond".bright_blue().bold(),
-                    "export".bright_yellow().bold(),
-                    "(name of expoert).json".bright_yellow().bold(),
-                    "master-key".bright_yellow().bold(),
-                    "Option: external path".bright_yellow().bold(),
-                );
-            }
-            "-l" => {
-                help_helper_()?;
-            }
-            _ => {
-                if !data.get_token(&1)?.is_empty() {
-                    println!(
-                        ">> The flag [{}] you used is not vaild flag please use [{} -l] to check all the available flags",
-                        data.get_token(&1)?.bright_red().bold(),
-                        "help".bright_yellow().bold()
-                    )
-                }
-            }
+        }
     }
     Ok(())
 }
