@@ -2,8 +2,8 @@
   <img src="assets/ascii-art-logo-d.png" alt="Diamond Vault">
 </p>
 
-A secure, REPL based password manager built in Rust with military-grade encryption.
-
+## about
+**a repl based sensitive information vault built in with rust**
 ## Features
 
 - **AES-256-GCM encryption** for password storage
