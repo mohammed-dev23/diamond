@@ -1,6 +1,4 @@
 <p align="center">
-```
-
       __________________
     .-'  \ _.-''-._ /  '-.
   .-/\   .'.      .'.   /\-.
@@ -14,8 +12,6 @@
            '.\  /.'    Safe Place For Your Information
              '\/'
 
-```
-```
 </p>
 
 A secure, REPL based password manager built in Rust with military-grade encryption.
