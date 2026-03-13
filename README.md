@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/ascii-art-image.png" alt="Diamond Vault">
+  <img src="assets/ascii-art-logo-d.png" alt="Diamond Vault">
 </p>
 
 A secure, REPL based password manager built in Rust with military-grade encryption.
