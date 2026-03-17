@@ -50,7 +50,6 @@ pub fn read_json(ef: Option<&str>) -> anyhow::Result<Vec<Fields>> {
 
         o?
     } else {
-        
         fs::File::open(
             main_vault_path
                 .join("gem.json")
@@ -158,10 +157,8 @@ fn read_json_import(ef: Option<&str>, name_of_vault: &str) -> anyhow::Result<Vec
     let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
 
     let mut o = if let Some(ef) = ef {
-        
         fs::File::open(home_dirr()?.join(ef))?
     } else {
-        
         fs::File::open(
             main_vault_path
                 .join(name_of_vault)
