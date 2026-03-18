@@ -31,7 +31,7 @@ pub fn _init_() -> anyhow::Result<()> {
         let json_init = serde_json::to_string_pretty::<Vec<Fields>>(&vec![])?;
         let main_vault: PathBuf = toml()?.dependencies.main_vault_path.into();
 
-        fs::write(main_vault.join("gem.json"), json_init)?;
+        fs::write(main_vault, json_init)?;
     }
     Ok(())
 }
@@ -60,7 +60,7 @@ pub fn print_mini_logo() {
      '.'  \  '  '  /  '.'
        ':  \:    :/  :'
          '. \    / .'
-           '.\  /.'    Safe Place For Your Information
+           '.\  /.'    @Safe Place For Your Information To Be In
              '\/'"#
             .bright_cyan()
             .bold()

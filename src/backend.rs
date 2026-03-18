@@ -39,6 +39,16 @@ pub mod safe {
         }
     }
 
+    impl<T> Checkers for Option<T> {
+        type Out = anyhow::Result<T>;
+        fn checker(self, res: String) -> Self::Out {
+            match self {
+                Some(s) => Ok(s),
+                None => Err(anyhow!("missing value [{}]", res)),
+            }
+        }
+    }
+
     impl MasterKey for String {
         type Out = anyhow::Result<String>;
 

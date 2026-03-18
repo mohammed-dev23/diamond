@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/ascii-art-logo-d.png" alt="Diamond Vault">
+  <img src="assets/ascii-art-image.png">
 </p>
 
 ## about
@@ -146,6 +146,35 @@ import <any.json> <new-any.json>
 
 **Keep in mind** in order to import you'll need the **master-key** you used in export 
 
+#### Rename
+```
+rename <old-id> <new-id> <<Option: external path>>
+```
+Example:
+```
+rename <any> <new-any>
+rename <any> <new-any> <<path.json>>
+```
+#### Update
+```
+upadte <id> <new-identifier> <new-password> <<Option: external path>>
+```
+Example:
+```
+upadte <any> <new-any> <new-any>
+upadte <any> <new-any> <new-any> <<any.json>>
+```
+
+- Keep in mind that you'll need the **mastre-key** you used in the first time in order to change them!
+#### Note
+```
+note <id> <<note>> <<Option: external path>>
+```
+Example:
+```
+note <id-any> <<this is a new note>>
+note <id-any> <<"">> <<any.json>>
+```
 ## Password Requirements
 
 - **Master Key**: Minimum 16 characters, must pass strength validation
@@ -167,7 +196,8 @@ Each entry stores:
 - `salt` : the salt used in encrypting
 - `nonce`: the nonce used in encryptinh
 - `note`: a note
-- `date`: the date of creation
+- `identifier`: the identifier you added
+- `password`: the password of identifier
 - `data`: Base64-encoded encrypted blob containing username/email/etc.. and password
 
 ## Building from Source

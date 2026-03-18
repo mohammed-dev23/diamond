@@ -22,7 +22,8 @@ pub struct Entry {
     pub id: String,
     pub salt: String,
     pub nonce: String,
-    pub data: String,
+    pub identifiers: String,
+    pub password: String,
     pub note: Option<String>,
     pub date: String,
 }
@@ -50,12 +51,7 @@ pub fn read_json(ef: Option<&str>) -> anyhow::Result<Vec<Fields>> {
 
         o?
     } else {
-        fs::File::open(
-            main_vault_path
-                .join("gem.json")
-                .to_string_lossy()
-                .to_string(),
-        )?
+        fs::File::open(main_vault_path)?
     };
 
     o.read_to_string(&mut s)?;
@@ -67,11 +63,9 @@ pub fn read_json(ef: Option<&str>) -> anyhow::Result<Vec<Fields>> {
     }
 }
 
-pub fn enc(
-    master_key: &str,
-    username_email: &str,
-    password: &str,
-) -> anyhow::Result<([u8; 16], [u8; 12], Vec<u8>)> {
+pub type Encoded = ([u8; 16], [u8; 12], Vec<u8>, Vec<u8>);
+
+pub fn enc(master_key: &str, username_email: &str, password: &str) -> anyhow::Result<Encoded> {
     let mut salt = [0u8; 16];
     OsRng.fill_bytes(&mut salt);
     let argon2 = Argon2::default();
@@ -85,16 +79,18 @@ pub fn enc(
     let cip = Aes256Gcm::new(key);
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
 
-    let format = Zeroizing::new(format!("{}|{}", username_email, password));
-
-    let enc = cip
-        .encrypt(&nonce, format.as_bytes())
+    let username = cip
+        .encrypt(&nonce, username_email.as_bytes())
         .map_err(|_| anyhow!("Couldn't enc data"))?;
 
-    Ok((salt, nonce.into(), enc))
+    let password = cip
+        .encrypt(&nonce, password.as_bytes())
+        .map_err(|_| anyhow!("Couldn't enc data"))?;
+
+    Ok((salt, nonce.into(), username, password))
 }
 
-pub fn dec(master_key: &str, id: &str, ef: Option<&str>) -> anyhow::Result<Vec<u8>> {
+pub fn dec(master_key: &str, id: &str, ef: Option<&str>) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let read_json = read_json(ef)?;
 
     let entry = if let Some(s) = read_json.iter().find(|s| s.entry.id == *id) {
@@ -103,10 +99,11 @@ pub fn dec(master_key: &str, id: &str, ef: Option<&str>) -> anyhow::Result<Vec<u
         return Err(anyhow!("Couldn't get data"));
     };
 
-    let (salt, nonce, data) = (
+    let (salt, nonce, username, password) = (
         BASE64_STANDARD.decode(&entry.salt)?,
         BASE64_STANDARD.decode(&entry.nonce)?,
-        BASE64_STANDARD.decode(&entry.data)?,
+        BASE64_STANDARD.decode(&entry.identifiers)?,
+        BASE64_STANDARD.decode(&entry.password)?,
     );
 
     let argon2 = Argon2::default();
@@ -120,11 +117,13 @@ pub fn dec(master_key: &str, id: &str, ef: Option<&str>) -> anyhow::Result<Vec<u
     let cip = Aes256Gcm::new(key);
     let nonce = Nonce::from_slice(&nonce);
 
-    let dec = cip
-        .decrypt(nonce, data.as_ref())
+    let username = cip
+        .decrypt(nonce, username.as_ref())
         .map_err(|e| anyhow!("Couldn't dec data | try again with the correct master-key! <{e}>"))?;
-
-    Ok(dec)
+    let password = cip
+        .decrypt(nonce, password.as_ref())
+        .map_err(|e| anyhow!("Couldn't dec data | try again with the correct master-key! <{e}>"))?;
+    Ok((username, password))
 }
 
 pub fn enc_vault(

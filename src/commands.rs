@@ -10,7 +10,7 @@ use std::{
 use zeroize::Zeroizing;
 
 use crate::{
-    backend::safe::AnyHowErrHelper,
+    backend::safe::{AnyHowErrHelper, FileChecker},
     crypto::{self, dec_vault, enc_vault},
     toml,
     vault::home_dirr,
@@ -35,10 +35,12 @@ pub fn add(
     let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
 
     let enc = enc(&master_key, username_email, &password)?;
-    let (salt, nonce, data) = (
+
+    let (salt, nonce, username, password) = (
         BASE64_STANDARD.encode(enc.0),
         BASE64_STANDARD.encode(enc.1),
         BASE64_STANDARD.encode(enc.2),
+        BASE64_STANDARD.encode(enc.3),
     );
 
     let date_of_adding = chrono::Local::now().to_string();
@@ -48,7 +50,8 @@ pub fn add(
             id: id.to_string(),
             salt,
             nonce,
-            data,
+            identifiers: username,
+            password,
             note: note.map(String::from),
             date: date_of_adding,
         },
@@ -63,9 +66,9 @@ pub fn add(
         #[cfg(unix)]
         set_perm_over_file(&home_dirr()?.join(o))?;
     } else {
-        atomic_writer(&main_vault_path.join("gem.json"), &json)?;
+        atomic_writer(&main_vault_path, &json)?;
         #[cfg(unix)]
-        set_perm_over_file(&main_vault_path.join("gem.json"))?;
+        set_perm_over_file(&main_vault_path)?;
     }
 
     println!(
@@ -82,15 +85,15 @@ pub fn get(id: &str, master_key: &str, ef: Option<&str>) -> anyhow::Result<()> {
     let master_key = Zeroizing::new(master_key.to_string());
 
     let dec = dec(&master_key, id, ef)?;
-    let dec = String::from_utf8(dec)?;
-    let decc: Vec<String> = dec.split('|').map(|s| s.to_string()).collect();
+    let username = String::from_utf8(dec.0)?;
+    let password = String::from_utf8(dec.1)?;
 
     println!(
         ">>{}: got [{}] [{}] [{}]",
         "diamond".bright_cyan().bold(),
         id.to_string().white().bold(),
-        &decc[0].bright_white().bold(),
-        &decc[1].bright_white().bold()
+        &username.bright_white().bold(),
+        &password.bright_white().bold()
     );
 
     Ok(())
@@ -152,9 +155,9 @@ pub fn remove(id: &str, ef: Option<&str>, master_key: &str) -> anyhow::Result<()
             #[cfg(unix)]
             set_perm_over_file(&home_dirr()?.join(ef))?;
         } else {
-            atomic_writer(&main_vault_path.join("gem.json"), &json)?;
+            atomic_writer(&main_vault_path, &json)?;
             #[cfg(unix)]
-            set_perm_over_file(&main_vault_path.join("gem.json"))?;
+            set_perm_over_file(&main_vault_path)?;
         }
         println!(
             ">>{} removed [{}]",
@@ -211,7 +214,7 @@ pub fn export(ef: Option<&str>, name_of_export: &str, master_key: &str) -> anyho
     if let Some(ef) = ef {
         fs::File::open(home_dirr()?.join(ef))?.read_to_string(&mut vault)?;
     } else {
-        fs::File::open(main_vault_path.join("gem.json"))?.read_to_string(&mut vault)?;
+        fs::File::open(main_vault_path)?.read_to_string(&mut vault)?;
     };
 
     let (salt, nonce, data) = enc_vault(&master_key, vault)?;
@@ -249,5 +252,105 @@ fn atomic_writer(path: &PathBuf, content: &str) -> anyhow::Result<()> {
     let tmp = path.with_extension("tmp");
     fs::write(&tmp, content)?;
     fs::rename(&tmp, path)?;
+    Ok(())
+}
+
+pub fn rename(id: &str, new_id: &str, ef: Option<&str>) -> anyhow::Result<()> {
+    let mut read_json = read_json(ef)?;
+
+    let valut_path: PathBuf = toml()?.dependencies.main_vault_path.into();
+
+    if let Some(idd) = read_json.iter_mut().find(|s| s.entry.id == id) {
+        idd.entry.id = new_id.to_string();
+    }
+
+    let json = serde_json::to_string_pretty(&read_json)?;
+
+    if let Some(ef) = ef {
+        atomic_writer(&home_dirr()?.join(ef), &json)?;
+        #[cfg(unix)]
+        set_perm_over_file(&home_dirr()?.join(ef))?;
+    } else {
+        atomic_writer(&valut_path, &json)?;
+        #[cfg(unix)]
+        set_perm_over_file(&valut_path)?;
+    }
+
+    println!(">>{}", "renamed!".bright_cyan().bold());
+    Ok(())
+}
+
+pub fn update(
+    master_key: &str,
+    ef: Option<&str>,
+    id: &str,
+    new_user_name: &str,
+    new_password: &str,
+) -> anyhow::Result<()> {
+    let master_key = Zeroizing::new(master_key.to_string());
+    let new_password = Zeroizing::new(new_password.to_string());
+
+    let mut read_json = read_json(ef)?;
+
+    dec(&master_key, id, ef)
+        .map_err(|_| anyhow!("Incorrect master-key!"))
+        .pe()?;
+
+    let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
+
+    if let Some(new) = read_json.iter_mut().find(|s| s.entry.id == id) {
+        let enc = enc(&master_key, new_user_name, &new_password)?;
+        let (salt, nonce, username, password) = (
+            BASE64_STANDARD.encode(enc.0),
+            BASE64_STANDARD.encode(enc.1),
+            BASE64_STANDARD.encode(enc.2),
+            BASE64_STANDARD.encode(enc.3),
+        );
+
+        new.entry.identifiers = username;
+        new.entry.password = password;
+        new.entry.salt = salt;
+        new.entry.nonce = nonce;
+    }
+
+    let json = serde_json::to_string_pretty(&read_json)?;
+
+    if let Some(ef) = ef {
+        atomic_writer(&home_dirr()?.join(ef), &json)?;
+        #[cfg(unix)]
+        set_perm_over_file(&home_dirr()?.join(ef))?;
+    } else {
+        atomic_writer(&main_vault_path, &json)?;
+        #[cfg(unix)]
+        set_perm_over_file(&main_vault_path)?;
+    }
+
+    println!(
+        ">>{}",
+        "update completed successfully!".bright_cyan().bold()
+    );
+    Ok(())
+}
+
+pub fn note(id: &str, note: &str, ef: Option<&str>) -> anyhow::Result<()> {
+    let mut read_json = read_json(ef)?;
+    let main_valut: PathBuf = toml()?.dependencies.main_vault_path.into();
+
+    if let Some(notee) = read_json.iter_mut().find(|s| s.entry.id == id) {
+        notee.entry.note = Some(note.to_string().check_existing_ids(id, ef).pe()?);
+    }
+
+    let json = serde_json::to_string_pretty(&read_json)?;
+
+    if let Some(ef) = ef {
+        atomic_writer(&home_dirr()?.join(ef), &json)?;
+        #[cfg(unix)]
+        set_perm_over_file(&home_dirr()?.join(ef))?;
+    } else {
+        atomic_writer(&main_valut, &json)?;
+        #[cfg(unix)]
+        set_perm_over_file(&main_valut)?;
+    }
+    println!(">>{}", "Note changed/added".bright_cyan().bold());
     Ok(())
 }

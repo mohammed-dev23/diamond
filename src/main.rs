@@ -16,8 +16,8 @@ use crate::{
     },
     commands::{generate_password, list},
     helpers::{
-        add_helper, export_helper, get_helper, help_helper, import_helper, remove_helper,
-        search_helper,
+        add_helper, export_helper, get_helper, help_helper, import_helper, note_helper,
+        remove_helper, rename_helper, search_helper, update_helper,
     },
     toml::toml,
     vault::{_init_, print_mini_logo},
@@ -45,6 +45,9 @@ pub enum Commands {
     Gp,
     Import,
     Help,
+    Rename,
+    Update,
+    Note,
 }
 
 pub fn commandsmatch(command: &str) -> Option<Commands> {
@@ -60,6 +63,9 @@ pub fn commandsmatch(command: &str) -> Option<Commands> {
         "gp" => Some(Commands::Gp),
         "import" => Some(Commands::Import),
         "help" => Some(Commands::Help),
+        "rename" => Some(Commands::Rename),
+        "update" => Some(Commands::Update),
+        "note" => Some(Commands::Note),
         _ => None,
     }
 }
@@ -125,6 +131,15 @@ fn interface() -> anyhow::Result<()> {
         }
         Some(Commands::Import) => {
             import_helper(&data, 1).pe()?;
+        }
+        Some(Commands::Rename) => {
+            rename_helper(&data, &data_token, 1).pe()?;
+        }
+        Some(Commands::Update) => {
+            update_helper(&data, &data_token, 1).pe()?;
+        }
+        Some(Commands::Note) => {
+            note_helper(&data, &data_token, 1).pe()?;
         }
         None => {
             if !data.get_token(&0)?.is_empty() {
