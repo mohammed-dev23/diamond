@@ -50,7 +50,7 @@ pub fn add(
             id: id.to_string(),
             salt,
             nonce,
-            identifiers: username,
+            identifier: username,
             password,
             note: note.map(String::from),
             date: date_of_adding,
@@ -307,7 +307,7 @@ pub fn update(
             BASE64_STANDARD.encode(enc.3),
         );
 
-        new.entry.identifiers = username;
+        new.entry.identifier = username;
         new.entry.password = password;
         new.entry.salt = salt;
         new.entry.nonce = nonce;
@@ -352,5 +352,30 @@ pub fn note(id: &str, note: &str, ef: Option<&str>) -> anyhow::Result<()> {
         set_perm_over_file(&main_valut)?;
     }
     println!(">>{}", "Note changed/added".bright_cyan().bold());
+    Ok(())
+}
+
+pub fn fuzzy(keyword: &str, ef: Option<&str>) -> anyhow::Result<()> {
+    let read_json = read_json(ef)?;
+
+    for i in read_json {
+        let note = if let Some(s) = i.entry.note {
+            s.to_string()
+        } else {
+            String::new()
+        };
+
+        if i.entry.id.contains(keyword) {
+            println!(
+                ">>Found >{}: {} | {}: {} | {}: {}<",
+                "id".bright_yellow().bold(),
+                i.entry.id.bright_blue().bold(),
+                "note".bright_yellow().bold(),
+                note.bright_blue().bold(),
+                "date".bright_yellow().bold(),
+                i.entry.date.bright_blue().bold(),
+            )
+        }
+    }
     Ok(())
 }

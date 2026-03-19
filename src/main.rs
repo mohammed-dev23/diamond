@@ -16,8 +16,8 @@ use crate::{
     },
     commands::{generate_password, list},
     helpers::{
-        add_helper, export_helper, get_helper, help_helper, import_helper, note_helper,
-        remove_helper, rename_helper, search_helper, update_helper,
+        add_helper, export_helper, fuzzy_helper, get_helper, help_helper, import_helper,
+        note_helper, remove_helper, rename_helper, search_helper, update_helper,
     },
     toml::toml,
     vault::{_init_, print_mini_logo},
@@ -48,6 +48,7 @@ pub enum Commands {
     Rename,
     Update,
     Note,
+    Fuzzy,
 }
 
 pub fn commandsmatch(command: &str) -> Option<Commands> {
@@ -66,6 +67,7 @@ pub fn commandsmatch(command: &str) -> Option<Commands> {
         "rename" => Some(Commands::Rename),
         "update" => Some(Commands::Update),
         "note" => Some(Commands::Note),
+        "fuzzy" => Some(Commands::Fuzzy),
         _ => None,
     }
 }
@@ -140,6 +142,9 @@ fn interface() -> anyhow::Result<()> {
         }
         Some(Commands::Note) => {
             note_helper(&data, &data_token, 1).pe()?;
+        }
+        Some(Commands::Fuzzy) => {
+            fuzzy_helper(&data, &data_token, 1).pe()?;
         }
         None => {
             if !data.get_token(&0)?.is_empty() {

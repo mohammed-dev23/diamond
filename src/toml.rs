@@ -13,11 +13,30 @@ pub struct Toml {
 #[derive(Serialize, Deserialize)]
 pub struct Customization {
     pub username: String,
+    pub allies: Option<Allies>,
 }
 #[derive(Serialize, Deserialize)]
 pub struct Dependencies {
     pub main_vault_path: String,
     pub toml_path: String,
+}
+#[derive(Serialize, Deserialize)]
+pub struct Allies {
+    pub add: Option<String>,
+    pub get: Option<String>,
+    pub list: Option<String>,
+    pub remove: Option<String>,
+    pub search: Option<String>,
+    pub export: Option<String>,
+    pub exit: Option<String>,
+    pub clear: Option<String>,
+    pub gp: Option<String>,
+    pub import: Option<String>,
+    pub help: Option<String>,
+    pub rename: Option<String>,
+    pub upadte: Option<String>,
+    pub note: Option<String>,
+    pub fuzzy: Option<String>,
 }
 
 pub fn toml() -> anyhow::Result<Toml> {
@@ -46,7 +65,10 @@ pub fn toml_init() -> anyhow::Result<()> {
         .to_string();
 
     let def_toml = Toml {
-        customization: Customization { username },
+        customization: Customization {
+            username,
+            allies: None,
+        },
         dependencies: Dependencies {
             main_vault_path,
             toml_path,

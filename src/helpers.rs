@@ -1,4 +1,4 @@
-use crate::commands::{add, get, note, remove, rename, search, update};
+use crate::commands::{add, fuzzy, get, note, remove, rename, search, update};
 use crate::{
     backend::{
         cleaner::extract_string_value_from_result,
@@ -479,6 +479,21 @@ pub fn note_helper(
     if let (Ok(id), Ok(notee)) = (id, notee) {
         id_does_not_existe(id, ID_INDEX, data, ef).pe()?;
         note(id, &notee, ef)?;
+    }
+    Ok(())
+}
+
+pub fn fuzzy_helper(
+    data: &Vec<String>,
+    data_token: &[String],
+    mut index: usize,
+) -> anyhow::Result<()> {
+    let key_word = data.get_token(&index).checker("keyword".to_string()).pe();
+    index += 1;
+    let ef = data_token.get(index).map(|s| s.as_str());
+
+    if let Ok(key) = key_word {
+        fuzzy(key, ef)?;
     }
     Ok(())
 }
