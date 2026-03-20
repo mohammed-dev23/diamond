@@ -255,7 +255,7 @@ pub mod parser {
             if let Some(d) = self.get(*index) {
                 Ok(d.as_str())
             } else {
-                return Ok("");
+                Ok("")
             }
         }
     }

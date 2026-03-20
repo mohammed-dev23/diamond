@@ -114,7 +114,7 @@ fn interface() -> anyhow::Result<()> {
     let data = parse_input(input.trim().to_string())?;
     let data_token = parse_input_by_token(input.trim().to_string())?;
 
-    match commandsmatch().get(&data.get_token(&0)?.to_string()) {
+    match commandsmatch().get(data.get_token(&0)?) {
         Some(Commands::Add) => {
             add_helper(1, &data, &data_token)?;
         }
