@@ -1,8 +1,16 @@
-use std::{fs, io::Read};
+use std::{fs, io::Read, path::PathBuf};
 
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 
-use crate::vault::home_dirr;
+use crate::{
+    backend::{
+        parser::Token,
+        safe::{AnyHowErrHelper, Checkers},
+    },
+    commands::atomic_writer,
+    vault::home_dirr,
+};
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Toml {
@@ -38,6 +46,7 @@ pub struct Allies {
     pub note: Option<String>,
     pub fuzzy: Option<String>,
     pub switch_vault: Option<String>,
+    pub toma: Option<String>,
 }
 
 pub fn toml() -> anyhow::Result<Toml> {
@@ -78,5 +87,131 @@ pub fn toml_init() -> anyhow::Result<()> {
 
     let make_data = toml::to_string(&def_toml)?;
     fs::write(home_dirr()?.join("diamond/gem.toml"), make_data)?;
+    Ok(())
+}
+
+pub fn toma(data: &Vec<String>, mut index: usize) -> anyhow::Result<()> {
+    let mut toml_file = toml()?;
+    let change = data
+        .get_token(&index)
+        .checker("what to change".to_string())
+        .pe()?;
+    index += 1;
+
+    let changer = |checker_mas: &str, indexx: &usize| {
+        data.get_token(&indexx)
+            .checker(checker_mas.to_string())
+            .pe()
+    };
+
+    match change.trim() {
+        "main-vault-path" => {
+            let new_path = changer("path.json", &index)?;
+            toml_file.dependencies.main_vault_path =
+                home_dirr()?.join(new_path).to_string_lossy().to_string();
+        }
+        "toml-file-path" => {
+            let new_path = changer("path.json", &index)?;
+            toml_file.dependencies.toml_path =
+                home_dirr()?.join(new_path).to_string_lossy().to_string();
+        }
+        "username" => {
+            let new_user = changer("new-username", &index)?;
+            toml_file.customization.username = new_user.to_string();
+        }
+        "allies" => {
+            let ali_to_change = changer("allie to change", &index)?;
+            index += 1;
+            let new_allies = changer("new-allies", &index)?;
+
+            match ali_to_change.trim() {
+                "add" => {
+                    toml_file.customization.allies.get_or_insert_default().add =
+                        Some(new_allies.to_string());
+                }
+                "get" => {
+                    toml_file.customization.allies.get_or_insert_default().get =
+                        Some(new_allies.to_string());
+                }
+                "remove" => {
+                    toml_file
+                        .customization
+                        .allies
+                        .get_or_insert_default()
+                        .remove = Some(new_allies.to_string());
+                }
+                "list" => {
+                    toml_file.customization.allies.get_or_insert_default().list =
+                        Some(new_allies.to_string());
+                }
+                "rename" => {
+                    toml_file
+                        .customization
+                        .allies
+                        .get_or_insert_default()
+                        .rename = Some(new_allies.to_string());
+                }
+                "clear" => {
+                    toml_file.customization.allies.get_or_insert_default().clear =
+                        Some(new_allies.to_string());
+                }
+                "exit" => {
+                    toml_file.customization.allies.get_or_insert_default().exit =
+                        Some(new_allies.to_string());
+                }
+                "export" => {
+                    toml_file
+                        .customization
+                        .allies
+                        .get_or_insert_default()
+                        .export = Some(new_allies.to_string());
+                }
+                "import" => {
+                    toml_file
+                        .customization
+                        .allies
+                        .get_or_insert_default()
+                        .import = Some(new_allies.to_string());
+                }
+                "search" => {
+                    toml_file
+                        .customization
+                        .allies
+                        .get_or_insert_default()
+                        .search = Some(new_allies.to_string());
+                }
+                "fuzzy" => {
+                    toml_file.customization.allies.get_or_insert_default().fuzzy =
+                        Some(new_allies.to_string());
+                }
+                "switch-vault" => {
+                    toml_file
+                        .customization
+                        .allies
+                        .get_or_insert_default()
+                        .switch_vault = Some(new_allies.to_string());
+                }
+                "update" => {
+                    toml_file
+                        .customization
+                        .allies
+                        .get_or_insert_default()
+                        .update = Some(new_allies.to_string());
+                }
+                "note" => {
+                    toml_file.customization.allies.get_or_insert_default().note =
+                        Some(new_allies.to_string());
+                }
+                "toma" => {
+                    toml_file.customization.allies.get_or_insert_default().toma =
+                        Some(new_allies.to_string());
+                }
+                _ => {}
+            }
+        }
+        _ => return Err(anyhow!(">>Unkown flag [{}]", change)),
+    }
+    let json = toml::to_string(&toml_file)?;
+    atomic_writer(&PathBuf::from(toml_file.dependencies.toml_path), &json)?;
     Ok(())
 }

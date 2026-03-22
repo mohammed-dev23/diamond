@@ -256,7 +256,7 @@ pub mod parser {
                 Ok(d.as_str())
             } else {
                 use anyhow::anyhow;
-                return Err(anyhow!("Couldn't get data from the parser!"));
+                Err(anyhow!("Couldn't get data from the parser!"))
             }
         }
     }

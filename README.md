@@ -20,7 +20,7 @@
 diamond uses industry-standard cryptography:
 
 - **Encryption**: AES-256-GCM with random nonce per entry
-- **Key Derivation**: Argon2 with random 16-byte salt
+- **Key Derivation**: Argon2 with random 32-byte salt
 - **Memory Safety**: Zeroizing for sensitive data in memory
 - **File Permissions**: Unix 0600 (owner read/write only)
 
@@ -53,10 +53,10 @@ add <username/email> <password> <id> <<Option: note> <<Option: external path>>
 
 Example:
 ```
-add user@example.com MyP@ssw0rd github MyMasterKey123456
-add user@example.com MyP@ssw0rd github MyMasterKey123456 <note>
-add user@example.com MyP@ssw0rd github MyMasterKey123456 <note> <path>
-add user@example.com MyP@ssw0rd github MyMasterKey123456 <> <path>
+add user@example.com MyP@ssw0rd github 
+add user@example.com MyP@ssw0rd github  <note>
+add user@example.com MyP@ssw0rd github  <note> <path.json>
+add user@example.com MyP@ssw0rd github  <path.json>
 ```
 
 #### Get a password
@@ -157,15 +157,15 @@ rename <any> <new-any> <<path.json>>
 ```
 #### Update
 ```
-upadte <id> <new-identifier> <new-password> <<Option: external path>>
+update <id> <new-identifier> <new-password> <<Option: external path>>
 ```
 Example:
 ```
-upadte <any> <new-any> <new-any>
-upadte <any> <new-any> <new-any> <<any.json>>
+update <any> <new-any> <new-any>
+update <any> <new-any> <new-any> <<any.json>>
 ```
 
-- Keep in mind that you'll need the **mastre-key** you used in the first time in order to change them!
+- Keep in mind that you'll need the **master-key** you used in the first time in order to change them!
 #### Note
 ```
 note <id> <<note>> <<Option: external path>>
@@ -183,6 +183,26 @@ Example:
 ```
 fuzzy test
 fuzzy test <any.json>
+```
+#### switch-vault 
+```
+switch-vault <vault.json>
+```
+Example:
+```
+switch-vault any.json
+```
+#### toma a toml config manager
+```
+toma <toml-file-path/main-vault-path/username/allies> <new-value> |if allies <add/get/etc..> <new-allies>|
+```
+Example:
+```
+toma toml-file-path new_path.toml
+toma main-vault-path new_path.json
+toma username gem!.
+toma allies add ahh
+toma allies list ls 
 ```
 ## Password Requirements
 
@@ -203,11 +223,11 @@ External vaults are stored at the specified path relative to `~`.
 Each entry stores:
 - `id`: id identifier
 - `salt` : the salt used in encrypting
-- `nonce`: the nonce used in encryptinh
+- `nonce`: the nonce used in encrypting
 - `note`: a note
 - `identifier`: the identifier you added
 - `password`: the password of identifier
-- `data`: Base64-encoded encrypted blob containing username/email/etc.. and password
+- `date`: the date of when the entry was created
 
 ## Building from Source
 
@@ -221,7 +241,7 @@ cargo build --release
 ⚠️ **Important**:
 
 - Never share your master key
-- The master key encrypts/decrypts your vault and every thing else
+- The master key encrypts/decrypts your vault and everything else
 - Loss of master-key means permanent data loss
 - Store vault backups securely
 

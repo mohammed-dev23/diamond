@@ -36,13 +36,12 @@ pub fn add_helper(
     let note = data_token.get(index).map(|s| s.as_str());
 
     let note = if let Some(note) = note {
-        let note = if note.contains(".json") {
+        if note.contains(".json") {
             index -= 1;
             None
         } else {
             Some(note)
-        };
-        note
+        }
     } else {
         None
     };
@@ -57,7 +56,7 @@ pub fn add_helper(
         .pe();
 
     let master_key = master_key
-        .check_password_strength("Master-key", &username_email)
+        .check_password_strength("Master-key", username_email)
         .pe()?;
 
     let id = &id.to_string().check_existing_ids(id, ef).pe()?;
@@ -76,16 +75,10 @@ pub fn get_helper(
     index += 1;
     let with_clip_or_not: bool = data
         .get_token(&index)
-        .map(|s| {
-            if s.to_string() == "--without-clipboard" {
-                true
-            } else {
-                false
-            }
-        })
+        .map(|s| s == "--without-clipboard")
         .unwrap_or(false);
 
-    if with_clip_or_not == false {
+    if !with_clip_or_not {
         index -= 1;
     }
 
@@ -195,23 +188,29 @@ pub fn help_helper_() -> anyhow::Result<()> {
     println!(
         ">> [{}] --[{}]",
         "help".bright_purple().bold(),
-        "add/get/remove/search/clear/exit/list/update/rename/note/fuzzy"
+        "add/get/remove/search/clear/exit/list/update/rename/note/fuzzy/switch-vault/toma"
             .bright_yellow()
             .bold()
     );
     println!(
-        ">> <{}: used to add passwords and so on> / <{}: used to get data>",
+        ">> <{}: used to add passwords and so on>",
         "add".bright_purple().bold(),
-        "get".bright_purple().bold()
+    );
+    println!(">> <{}: used to get data>", "get".bright_purple().bold());
+    println!(
+        ">> <{}: used to remove data from the file>",
+        "remove".bright_purple().bold(),
     );
     println!(
-        ">> <{}: used to remove data from the file> / <{}: used to search for data by there id name>",
-        "remove".bright_purple().bold(),
+        ">> <{}: used to search for data by there id name>",
         "search".bright_purple().bold()
     );
     println!(
-        ">> <{}: used to clear the term> / <{}: used to exit the program>",
+        ">> <{}: used to clear the term>",
         "clear".bright_purple().bold(),
+    );
+    println!(
+        ">> <{}: used to exit the program>",
         "exit".bright_purple().bold()
     );
     println!(
@@ -220,24 +219,44 @@ pub fn help_helper_() -> anyhow::Result<()> {
     );
 
     println!(
-        ">> <{}: used to list all the data> / <{}: used to generate new password>",
-        "list".bright_purple().bold(),
+        ">> <{}: used to generate new password>",
         "gp".bright_purple().bold(),
     );
     println!(
-        ">> <{}: used to export vaults> / <{}: used to import vaults using the master-key>",
+        ">> <{}: used to export vaults>",
         "export".bright_purple().bold(),
+    );
+    println!(
+        ">> <{}: used to import vaults using the master-key>",
         "import".bright_purple().bold(),
     );
     println!(
-        ">> <{}: used to change the password and the identifier by there id and using the master-key> / <{}: used to rename ids>",
+        ">> <{}: used to change the password and the identifier by there id and using the master-key>",
         "update".bright_purple().bold(),
+    );
+    println!(
+        ">> <{}: used to rename ids>",
         "rename".bright_purple().bold(),
     );
     println!(
-        ">> <{}: used to change a note or add it / <{}: used to make fuzzy search to grap any match using a keyword>",
+        ">> <{}: used to change a note or add it>",
         "note".bright_purple().bold(),
+    );
+    println!(
+        ">> <{}: used to make fuzzy search to grap any match using a keyword>",
         "fuzzy".bright_purple().bold(),
+    );
+    println!(
+        ">> <{}: as the name represents it's used to switch vaults using there files>",
+        "switch-vault".bright_purple().bold(),
+    );
+    println!(
+        ">> <{}: used to change things in the config file like [{}/{}/{}/{}]>",
+        "toma".bright_purple().bold(),
+        "username".bright_yellow().bold(),
+        "main-vault-path".bright_yellow().bold(),
+        "toml-file-path".bright_yellow().bold(),
+        "allies".bright_yellow().bold(),
     );
     Ok(())
 }
@@ -376,6 +395,27 @@ pub fn help_helper(data: &Vec<String>, index: usize) -> anyhow::Result<()> {
                 "fuzzy".bright_yellow().bold(),
                 "keyword".bright_yellow().bold(),
                 "Option: external path".bright_yellow().bold(),
+            )
+        }
+        "--switch-vault" => {
+            println!(
+                ">>{}: [{}] [{}] [{}]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "switch-vault".bright_yellow().bold(),
+                "path of vault(.json)".bright_yellow().bold(),
+            )
+        }
+        "--toma" => {
+            println!(
+                ">>{}: [{}] [{}] [{}] [{}]",
+                "Usage".bright_green().bold(),
+                "diamond".bright_blue().bold(),
+                "toma".bright_yellow().bold(),
+                "[username/main-vault-path/toml-file-path/allies]"
+                    .bright_yellow()
+                    .bold(),
+                "new-value".bright_yellow().bold(),
             )
         }
         "-l" => {

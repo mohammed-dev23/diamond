@@ -32,8 +32,7 @@ pub fn add(
     ef: Option<&str>,
 ) -> anyhow::Result<()> {
     let password = if password.contains("gp") {
-        let gp = generate_password()?;
-        gp
+        generate_password()?
     } else {
         password.to_string()
     };
@@ -289,7 +288,7 @@ pub fn import(master_key: &str, new_name: &str, path_of_vault: &str) -> anyhow::
     Ok(())
 }
 
-fn atomic_writer(path: &PathBuf, content: &str) -> anyhow::Result<()> {
+pub fn atomic_writer(path: &PathBuf, content: &str) -> anyhow::Result<()> {
     let tmp = path.with_extension("tmp");
     fs::write(&tmp, content)?;
     fs::rename(&tmp, path)?;

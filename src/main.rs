@@ -21,7 +21,7 @@ use crate::{
         EF_INDEX, ID_INDEX, add_helper, export_helper, fuzzy_helper, get_helper, help_helper,
         import_helper, note_helper, remove_helper, rename_helper, search_helper, update_helper,
     },
-    toml::toml,
+    toml::{toma, toml},
     vault::{_init_, print_mini_logo},
 };
 
@@ -52,6 +52,7 @@ pub enum Commands {
     Note,
     Fuzzy,
     SwitchVault,
+    Toma,
 }
 
 pub fn commandsmatch() -> HashMap<String, Commands> {
@@ -98,6 +99,7 @@ pub fn commandsmatch() -> HashMap<String, Commands> {
         toml.switch_vault.unwrap_or("switch-vault".to_string()),
         Commands::SwitchVault,
     );
+    hashmap.insert(toml.toma.unwrap_or("toma".to_string()), Commands::Toma);
     hashmap
 }
 
@@ -178,6 +180,9 @@ fn interface() -> anyhow::Result<()> {
         Some(Commands::SwitchVault) => {
             let new_vault_path = data.get_token(&1).checker("Vault-Path".to_string()).pe()?;
             switch_vault(new_vault_path).pe()?;
+        }
+        Some(Commands::Toma) => {
+            toma(&data, 1).pe()?;
         }
         None => {
             if !data.get_token(&0)?.is_empty() {

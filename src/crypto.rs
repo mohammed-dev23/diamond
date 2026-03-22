@@ -160,21 +160,14 @@ pub fn enc_vault(
     Ok((salt, nonce.into(), enc))
 }
 
-fn read_json_import(ef: Option<&str>, name_of_vault: &str) -> anyhow::Result<Vec<VaultExport>> {
+fn read_json_import(name_of_vault: &str) -> anyhow::Result<Vec<VaultExport>> {
     let mut s = String::new();
-
-    let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
-
-    let mut o = if let Some(ef) = ef {
-        fs::File::open(home_dirr()?.join(ef))?
-    } else {
-        fs::File::open(
-            main_vault_path
-                .join(name_of_vault)
-                .to_string_lossy()
-                .to_string(),
-        )?
-    };
+    let mut o = fs::File::open(
+        home_dirr()?
+            .join(name_of_vault)
+            .to_string_lossy()
+            .to_string(),
+    )?;
 
     o.read_to_string(&mut s)?;
 
@@ -186,7 +179,7 @@ fn read_json_import(ef: Option<&str>, name_of_vault: &str) -> anyhow::Result<Vec
 }
 
 pub fn dec_vault(master_key: &str, path_of_vault: &str) -> anyhow::Result<Vec<u8>> {
-    let read_json = read_json_import(Some(path_of_vault), path_of_vault)?;
+    let read_json = read_json_import(path_of_vault)?;
 
     if let Some(i) = read_json.into_iter().next() {
         let salt = i.salt;
@@ -208,8 +201,8 @@ pub fn dec_vault(master_key: &str, path_of_vault: &str) -> anyhow::Result<Vec<u8
         let cip = Aes256Gcm::new(key);
         let nonce = Nonce::from_slice(&nonce_decoded);
 
-        let dec = cip.decrypt(nonce, &*vault_decoded).map_err(|e| {
-            anyhow!("Couldn't dec data | try again with the correct master-key! <{e}>")
+        let dec = cip.decrypt(nonce, &*vault_decoded).map_err(|_| {
+            anyhow!("Couldn't dec data").context("try again with the correct master-key!")
         })?;
 
         return Ok(dec);
