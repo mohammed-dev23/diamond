@@ -3,15 +3,21 @@ use anyhow::anyhow;
 use arboard::Clipboard;
 use base64::prelude::*;
 use colored::Colorize;
+use qrcode::{
+    QrCode,
+    render::unicode::{self},
+};
 use rand::RngExt;
 use std::{
     fs,
     io::{Read, Write, stdin, stdout},
     path::PathBuf,
-    thread,
+    thread::sleep,
     time::Duration,
 };
 use zeroize::Zeroizing;
+
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::crypto::{Entry, Fields, dec, enc, read_json};
 use crate::{
@@ -91,89 +97,125 @@ pub fn add(
     Ok(())
 }
 
-pub fn get(
-    id: &str,
-    master_key: &str,
-    clipboard_or_without: bool,
-    ef: Option<&str>,
-) -> anyhow::Result<()> {
+#[derive(Debug)]
+pub struct Flags {
+    pub clip: Option<bool>,
+    pub encodded: Option<bool>,
+    pub qrcode: Option<bool>,
+}
+
+pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow::Result<()> {
     let master_key = Zeroizing::new(master_key.to_string());
 
-    let dec = dec(&master_key, id, ef)?;
+    let dec = dec(&master_key, id, ef)
+        .map_err(|_| anyhow!("invalid master key please try again later"))?;
+
     let username = String::from_utf8(dec.0)?;
     let password = String::from_utf8(dec.1)?;
 
-    #[cfg(not(feature = "termux"))]
+    if matches!(flags.clip, Some(false))
+        && matches!(flags.encodded, Some(false))
+        && matches!(flags.qrcode, Some(false))
     {
-        if !clipboard_or_without {
-            let mut c = Clipboard::new()?;
-            c.set_text(&password)?;
-            println!(
-                ">>{}, {}",
-                "wait for the password to be saved in the clipboard"
-                    .bright_blue()
-                    .bold(),
-                "it will take 5s..".bright_purple().bold()
-            );
+        println!(
+            ">>{}: got [{}] [{}] [{}]",
+            "diamond".bright_cyan().bold(),
+            id.to_string().white().bold(),
+            &username.bright_white().bold(),
+            &password.bright_white().bold()
+        )
+    }
 
-            let mut sec = 5;
+    if let Some(clipboard_or_without) = flags.clip {
+        #[cfg(not(feature = "termux"))]
+        {
+            if clipboard_or_without {
+                let mut c = Clipboard::new()?;
+                c.set_text(&password)?;
+                println!(
+                    ">>{}, {}",
+                    "wait for the password to be saved in the clipboard"
+                        .bright_blue()
+                        .bold(),
+                    "it will take 5s..".bright_purple().bold()
+                );
 
-            while sec > 0 {
-                println!("~{}", sec.to_string().bright_cyan().bold());
-                thread::sleep(Duration::from_secs(1));
-                sec -= 1;
+                let mut sec = 5;
+
+                while sec > 0 {
+                    let pb = ProgressBar::new(5);
+
+                    for _ in 0..5 {
+                        sleep(Duration::from_secs(1));
+                        pb.clone()
+                            .with_style(ProgressStyle::with_template(
+                                "⏳ ~> [{bar:40.cyan/blue}] {pos}/{len}s",
+                            )?)
+                            .inc(1);
+                    }
+                    sec = 0
+                }
+
+                println!(
+                    ">>{}: got [{}] [{}]",
+                    "diamond".bright_cyan().bold(),
+                    id.to_string().white().bold(),
+                    &username.bright_white().bold(),
+                );
             }
+        }
+        #[cfg(feature = "termux")]
+        {
+            if !clipboard_or_without {
+                terminal_clipboard::set_string(&password)
+                    .map_err(|_| anyhow!("Clouldn't copy to clipboard!"))?;
+                println!(
+                    ">>{}, {}",
+                    "wait for the password to be saved in the clipboard"
+                        .bright_blue()
+                        .bold(),
+                    "it will take 5s..".bright_purple().bold()
+                );
 
-            println!(
-                ">>{}: got [{}] [{}]",
-                "diamond".bright_cyan().bold(),
-                id.to_string().white().bold(),
-                &username.bright_white().bold(),
-            );
-        } else {
-            println!(
-                ">>{}: got [{}] [{}] [{}]",
-                "diamond".bright_cyan().bold(),
-                id.to_string().white().bold(),
-                &username.bright_white().bold(),
-                &password.bright_white().bold()
-            );
+                let mut sec = 5;
+
+                while sec > 0 {
+                    println!("~{}", sec.to_string().bright_cyan().bold());
+                    thread::sleep(Duration::from_secs(1));
+                    sec -= 1;
+                }
+
+                println!(
+                    ">>{}: got [{}] [{}]",
+                    "diamond".bright_cyan().bold(),
+                    id.to_string().white().bold(),
+                    &username.bright_white().bold(),
+                );
+            }
         }
     }
-    #[cfg(feature = "termux")]
-    {
-        if !clipboard_or_without {
-            terminal_clipboard::set_string(&password)
-                .map_err(|_| anyhow!("Clouldn't copy to clipboard!"))?;
-            println!(
-                ">>{}, {}",
-                "wait for the password to be saved in the clipboard"
-                    .bright_blue()
-                    .bold(),
-                "it will take 5s..".bright_purple().bold()
-            );
 
-            let mut sec = 5;
+    if let Some(qrcode) = flags.qrcode {
+        if qrcode {
+            let qrcode = QrCode::new(format!("{}|{}", username, password).as_bytes())?;
+            let string_qr = qrcode
+                .render::<unicode::Dense1x2>()
+                .max_dimensions(1, 1)
+                .quiet_zone(false)
+                .build();
 
-            while sec > 0 {
-                println!("~{}", sec.to_string().bright_cyan().bold());
-                thread::sleep(Duration::from_secs(1));
-                sec -= 1;
-            }
+            println!("{}", string_qr)
+        }
+    }
 
+    if let Some(with_hex) = flags.encodded {
+        if with_hex {
+            let encoded = hex::encode(format!("{}|{}", username, password));
             println!(
                 ">>{}: got [{}] [{}]",
                 "diamond".bright_cyan().bold(),
                 id.to_string().white().bold(),
-                &username.bright_white().bold(),
-            );
-        } else {
-            println!(
-                ">>{}: got [{}] [{}] [{}]",
-                "diamond".bright_cyan().bold(),
-                id.to_string().white().bold(),
-                &username.bright_white().bold(),
-                &password.bright_white().bold()
+                &encoded.bright_white().bold()
             );
         }
     }

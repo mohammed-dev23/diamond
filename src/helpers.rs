@@ -1,4 +1,4 @@
-use crate::commands::{add, fuzzy, get, note, remove, rename, search, update};
+use crate::commands::{Flags, add, fuzzy, get, note, remove, rename, search, update};
 use crate::{
     backend::{
         parser::Token,
@@ -73,17 +73,38 @@ pub fn get_helper(
     let id = data.get_token(&index).checker("id".to_string()).pe()?;
 
     index += 1;
-    let with_clip_or_not: bool = data
-        .get_token(&index)
-        .map(|s| s == "--without-clipboard")
-        .unwrap_or(false);
+    let flags = Flags {
+        clip: Some(
+            data.get_token(&index)
+                .map(|s| s == "--with-clipboard")
+                .unwrap_or(false),
+        ),
+        encodded: Some(
+            data.get_token(&index)
+                .map(|s| s == "--with-hex-fromat")
+                .unwrap_or(false),
+        ),
+        qrcode: Some(
+            data.get_token(&index)
+                .map(|s| s == "--as-qrcode")
+                .unwrap_or(false),
+        ),
+    };
 
-    if !with_clip_or_not {
+    if !flags.clip.unwrap_or(true)
+        || !flags.encodded.unwrap_or(true)
+        || !flags.qrcode.unwrap_or(true)
+    {
         index -= 1;
     }
 
     index += 1;
     let ef = data_token.get(index).map(|s| s.as_str());
+
+    if ef.is_some_and(|s| s.contains("--")) {
+        return Err(anyhow!("You can use flags in the place of <external file>"));
+    }
+
     id_does_not_existe(id, ID_INDEX, data, ef).pe()?;
 
     let master_key = helper_master_key()
@@ -92,7 +113,7 @@ pub fn get_helper(
         .master_key_checker()
         .pe()?;
 
-    get(id, &master_key, with_clip_or_not, ef).pe()?;
+    get(id, &master_key, flags, ef).pe()?;
     Ok(())
 }
 
@@ -280,11 +301,14 @@ pub fn help_helper(data: &Vec<String>, index: usize) -> anyhow::Result<()> {
         }
         "--get" => {
             println!(
-                ">>{}: [{}] [{}] [{}] [<{}>]",
+                ">>{}: [{}] [{}] [{}] --[{}] [<{}>]",
                 "Usage".bright_green().bold(),
                 "diamond".bright_blue().bold(),
                 "get".bright_yellow().bold(),
                 "id".bright_yellow().bold(),
+                "flag [--with-clipboard/--as-qrcode/--with-hex-format]"
+                    .bright_yellow()
+                    .bold(),
                 "Option: external path".bright_yellow().bold(),
             );
         }

@@ -1,6 +1,8 @@
 mod backend;
 mod crypto;
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::sleep, time::Duration};
+
+use indicatif::{ProgressBar, ProgressStyle};
 
 use anyhow::anyhow;
 use colored::Colorize;
@@ -29,8 +31,10 @@ fn main() -> anyhow::Result<()> {
     _init_()?;
     print_mini_logo();
 
+    let mut atm: u8 = 0;
+
     loop {
-        if interface().is_err() {
+        if interface(&mut atm).is_err() {
             continue;
         }
     }
@@ -104,7 +108,7 @@ pub fn commandsmatch() -> HashMap<String, Commands> {
     hashmap
 }
 
-fn interface() -> anyhow::Result<()> {
+fn interface(atm: &mut u8) -> anyhow::Result<()> {
     let mut rl = DefaultEditor::new()?;
 
     let username = toml().pe()?.customization.username;
@@ -127,7 +131,36 @@ fn interface() -> anyhow::Result<()> {
             add_helper(ID_INDEX, &data, &data_token)?;
         }
         Some(Commands::Get) => {
-            get_helper(ID_INDEX, &data, &data_token)?;
+            let get = get_helper(ID_INDEX, &data, &data_token);
+
+            let block_time = 30 * 60;
+
+            if get.is_err_and(|s| s.to_string().contains("invalid master key")) {
+                *atm += 1;
+                println!(
+                    ">>{} no.{} | 3 and you'll be blocked for 30min",
+                    "attempt".bright_cyan().bold(),
+                    atm.to_string().bright_red().bold()
+                );
+            }
+
+            if *atm >= 3 {
+                println!(
+                    ">>{} , {}",
+                    "you've passed the limit of attempts".bright_cyan().bold(),
+                    "you have been blocked for 30min!".bright_red().bold()
+                );
+                let pb = ProgressBar::new(block_time);
+
+                for _ in 0..block_time {
+                    sleep(Duration::from_secs(1));
+                    pb.clone()
+                        .with_style(ProgressStyle::with_template(
+                            "⏳ ~> [{bar:40.cyan/blue}] {pos}/{len}s",
+                        )?)
+                        .inc(1);
+                }
+            }
         }
 
         Some(Commands::Help) => help_helper(&data, 1).pe()?,

@@ -61,16 +61,22 @@ add user@example.com MyP@ssw0rd github  <path.json>
 
 #### Get a password
 ```
-get <id> <flag : --without-clipboard >> prints the password to the screen without saving it to clipboard><<Option: external path>>
+get <id> <flag> <<Option: external path>>
 ```
 
-**the clipboard wont work in termux so its --without-clipboard by default**
+##### Flags:
 
+**--with-clipboard** -> saving the password to clipboard
+**--as-qrcode** -> printing qrcode with identifier and password in it
+**--with-hex-format** -> prints the identifier and password in hex format
+
+**please keep in mind that the default flag is plaintext**
+**master key entered incorrectly for 3 times will get you block for 30min**
 Example:
 ```
 get github <any.json>
-get wifi --without-clipboard
-get clip --without-clipboard <any.json>
+get wifi --with-clipboard
+get clip --as-qrcode <any.json>
 ```
 
 #### List all entries
@@ -239,6 +245,7 @@ Each entry stores:
 
 ```bash
 cargo build --release
+cargo run --features termux --no-default-features **for Termux**
 ```
 ## Security Considerations
 
@@ -254,7 +261,7 @@ cargo build --release
 - **Linux/Unix**: Full support with file permissions
 - **macOS**: Full support with file permissions  
 - **Windows**: Core functionality (no Unix permissions)
-
+- **Termux** : Full support with file permissions
 ## Disclaimer
 
 This software is provided as-is. Always maintain backups of your password vault. The authors are not responsible for data loss or security breaches.
