@@ -66,9 +66,9 @@ get <id> <flag> <<Option: external path>>
 
 ##### Flags:
 
-**--with-clipboard** -> saving the password to clipboard
-**--as-qrcode** -> printing qrcode with identifier and password in it
-**--with-hex-format** -> prints the identifier and password in hex format
+- **--with-clipboard** -> saving the password to clipboard
+- **--as-qrcode** -> printing qrcode with identifier and password in it
+- **--with-hex-format** -> prints the identifier and password in hex format
 
 **please keep in mind that the default flag is plaintext**
 **master key entered incorrectly for 3 times will get you block for 30min**
