@@ -100,7 +100,7 @@ pub fn toma(data: &Vec<String>, mut index: usize) -> anyhow::Result<()> {
     index += 1;
 
     let changer = |checker_mas: &str, indexx: &usize| {
-        data.get_token(&indexx)
+        data.get_token(indexx)
             .checker(checker_mas.to_string())
             .pe()
     };

@@ -64,7 +64,7 @@ pub fn add(
     let content = Fields {
         entry: Entry {
             id: id.to_string(),
-            author: author,
+            author,
             salt,
             nonce,
             identifier: username,
@@ -127,8 +127,8 @@ pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow
         )
     }
 
-    if let Some(clipboard_or_without) = flags.clip {
-        if clipboard_or_without {
+    if let Some(clipboard_or_without) = flags.clip
+        && clipboard_or_without {
             terminal_clipboard::set_string(&password)
                 .map_err(|_| anyhow!("Clouldn't copy to clipboard!"))?;
             println!(
@@ -162,10 +162,9 @@ pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow
                 &username.bright_white().bold(),
             );
         }
-    }
 
-    if let Some(qrcode) = flags.qrcode {
-        if qrcode {
+    if let Some(qrcode) = flags.qrcode
+        && qrcode {
             let qrcode = QrCode::new(format!("{}|{}", username, password).as_bytes())?;
             let string_qr = qrcode
                 .render::<unicode::Dense1x2>()
@@ -175,10 +174,9 @@ pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow
 
             println!("{}", string_qr)
         }
-    }
 
-    if let Some(with_hex) = flags.encodded {
-        if with_hex {
+    if let Some(with_hex) = flags.encodded
+        && with_hex {
             let encoded = hex::encode(format!("{}|{}", username, password));
             println!(
                 ">>{}: got [{}] [{}]",
@@ -187,7 +185,6 @@ pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow
                 &encoded.bright_white().bold()
             );
         }
-    }
     Ok(())
 }
 pub fn list(ef: Option<&str>) -> anyhow::Result<()> {
