@@ -328,8 +328,11 @@ pub fn export(
     } else {
         fs::File::open(main_vault_path)?.read_to_string(&mut vault)?;
     };
+    
+    //pub crypto::enc_valut
+    let (salt, nonce, data, _2fa_n, _2fa_s) = enc_vault(&master_key, vault, _2fa_raw_s)?; 
 
-    let (salt, nonce, data, _2fa_n, _2fa_s) = enc_vault(&master_key, vault, _2fa_raw_s)?;
+    //_2fa_s: 
     let (encoded_salt, encoded_nonce, encoded_vault, encoded_nonce_totp, encoded_secret_totp) = (
         BASE64_STANDARD.encode(salt),
         BASE64_STANDARD.encode(nonce),
@@ -337,13 +340,16 @@ pub fn export(
         BASE64_STANDARD.encode(_2fa_n),
         BASE64_STANDARD.encode(_2fa_s),
     );
+
     let content = crypto::VaultExport {
         salt: encoded_salt,
         nonce: encoded_nonce,
+
         _2fa_: crypto::_2fa_ {
             totp_secret: encoded_secret_totp,
             totp_nonce: encoded_nonce_totp,
         },
+
         vault: encoded_vault,
     };
     let json = serde_json::to_string_pretty(&content)?;

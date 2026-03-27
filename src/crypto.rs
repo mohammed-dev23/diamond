@@ -4,12 +4,14 @@ use colored::Colorize;
 use std::{fs, io::Read, path::PathBuf};
 use totp_rs::TOTP;
 use zeroize::Zeroizing;
+use sha2::Sha256;
 
 use aes_gcm::{
     AeadCore, Aes256Gcm, Key, KeyInit, Nonce,
     aead::{Aead, OsRng, rand_core::RngCore},
 };
 use argon2::Argon2;
+use hkdf::Hkdf;
 use serde::{Deserialize, Serialize};
 
 use crate::{toml::toml, vault::home_dirr};
@@ -34,6 +36,7 @@ pub struct Entry {
     pub date: String,
     pub _2fa_: _2fa_,
 }
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct _2fa_ {
@@ -190,9 +193,12 @@ pub fn dec(
 
 pub type EncV = ([u8; 32], [u8; 12], Vec<u8>, Vec<u8>, Vec<u8>);
 
+
 pub fn enc_vault(master_key: &str, _vault_: String, _2fa_s: Vec<u8>) -> anyhow::Result<EncV> {
+
     let mut salt = [0u8; 32];
     OsRng.fill_bytes(&mut salt);
+
     let argon2 = Argon2::default();
     let mut out_master = Zeroizing::new([0u8; 32]);
     let _2fa_s = Zeroizing::new(_2fa_s);
@@ -201,16 +207,27 @@ pub fn enc_vault(master_key: &str, _vault_: String, _2fa_s: Vec<u8>) -> anyhow::
         .hash_password_into(master_key.as_bytes(), &salt, &mut *out_master)
         .map_err(|_| anyhow!("Couldn't hash master key"))?;
 
-    let key = Key::<Aes256Gcm>::from_slice(&*out_master);
-    let cip = Aes256Gcm::new(key);
+    let hk_c = Hkdf::<Sha256>::new(Some(&salt), &*out_master);
+    let mut vault_key = [0u8;32];
+    let mut totp_key = [0u8; 32];
+
+    hk_c.expand(b"cip_vault", &mut vault_key)
+        .map_err(|_| anyhow!("cip_vault failed [crypto.rs]"))?;
+
+    hk_c.expand(b"cip_totp", &mut totp_key)
+        .map_err(|_| anyhow!("cip_totp failed [crypto.rs]"))?;
+
+    let cip_vault = Aes256Gcm::new_from_slice(&vault_key)?;
+    let cip_totp  = Aes256Gcm::new_from_slice(&totp_key)?;
+
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let totp_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
 
-    let enc = cip
+    let enc = cip_vault
         .encrypt(&nonce, _vault_.as_bytes())
         .map_err(|_| anyhow!("Couldn't enc data"))?;
 
-    let totp_secret = cip
+    let totp_secret = cip_totp
         .encrypt(&totp_nonce, _2fa_s.as_slice())
         .map_err(|_| anyhow!("Couldn't enc totp secret"))?;
 
@@ -258,18 +275,28 @@ pub fn dec_vault(master_key: &str, path_of_vault: &str) -> anyhow::Result<(Vec<u
             .hash_password_into(master_key.as_bytes(), &salt_decoded, &mut *out_master)
             .map_err(|e| anyhow!("Couldn't hash the master-key <{e}>"))?;
 
-        let key = Key::<Aes256Gcm>::from_slice(&*out_master);
-        let cip = Aes256Gcm::new(key);
+        let hk = Hkdf::<Sha256>::new(Some(&salt_decoded), &*out_master);
+        let mut vault_key = [0u8;32];
+        hk.expand(b"cip_vault", &mut vault_key)
+            .map_err(|_| anyhow!("HKDF failed [crypto.rs]"))?;
+
+        let mut totp_key = [0u8; 32];
+        hk.expand(b"cip_totp", &mut totp_key)
+            .map_err(|_| anyhow!("HKDF failed [crypto.rs]"))?;
+
+        let cip_vault = Aes256Gcm::new_from_slice(&vault_key)?;
+        let cip_totp = Aes256Gcm::new_from_slice(&totp_key)?;
+
         let nonce = Nonce::from_slice(&nonce_decoded);
         let nonce_totp = Nonce::from_slice(&totp_n_dec);
 
         let totp_s = Zeroizing::new(totp_s_dec);
 
-        let dec = cip.decrypt(nonce, &*vault_decoded).map_err(|_| {
+        let dec = cip_vault.decrypt(nonce, &*vault_decoded).map_err(|_| {
             anyhow!("Couldn't dec data").context("try again with the correct master-key!")
         })?;
 
-        let totp_s = cip.decrypt(nonce_totp, totp_s.as_slice()).map_err(|_| {
+        let totp_s = cip_totp.decrypt(nonce_totp, totp_s.as_slice()).map_err(|_| {
             anyhow!("Couldn't dec data").context("try again with the correct master-key!")
         })?;
 
