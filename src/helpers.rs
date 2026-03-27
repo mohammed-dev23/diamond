@@ -10,6 +10,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use colored::Colorize;
+use zeroize::Zeroizing;
 
 pub const ID_INDEX: usize = 1;
 pub const EF_INDEX: usize = 1;
@@ -477,6 +478,8 @@ fn helper_master_key(totp_make: bool) -> anyhow::Result<(String, Vec<u8>)> {
         return Err(anyhow!("You Entered nothing!"));
     }
 
+    master_key_matcher(&master_key_input)?;
+
     let raw_s = if totp_make {
         let _2fa_s = totp_rs::Secret::generate_secret();
         let raw_s_2fa = _2fa_s.to_bytes()?;
@@ -496,6 +499,25 @@ fn helper_master_key(totp_make: bool) -> anyhow::Result<(String, Vec<u8>)> {
     };
 
     Ok((master_key_input, raw_s))
+}
+
+pub fn master_key_matcher(master_key: &str) -> anyhow::Result<()> {
+    let master_key = Zeroizing::new(master_key.to_string());
+
+    let format = format!(
+        ">>{} Your {}{}{} :",
+        "Renter".bright_cyan().bold(),
+        "<".bright_cyan().bold(),
+        "Your Master-Key".bright_magenta().bold(),
+        ">".bright_cyan().bold()
+    );
+    let renter_master_key = rpassword::prompt_password(format)?;
+
+    if master_key.to_string() == renter_master_key {
+        Ok(())
+    } else {
+        return Err(anyhow!("The master key didn't match try again!"));
+    }
 }
 
 pub fn rename_helper(

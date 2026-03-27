@@ -1,7 +1,7 @@
 mod backend;
 mod crypto;
 use anyhow::anyhow;
-use colored::Colorize;
+
 use std::collections::HashMap;
 mod commands;
 mod helpers;
@@ -20,7 +20,7 @@ use crate::{
         EF_INDEX, ID_INDEX, add_helper, export_helper, fuzzy_helper, get_helper, help_helper,
         import_helper, note_helper, remove_helper, rename_helper, search_helper, update_helper,
     },
-    toml::{toma, toml},
+    toml::{basic_hinter_based_in_config, toma, toml},
     vault::{_init_, print_mini_logo},
 };
 
@@ -58,7 +58,7 @@ pub enum Commands {
 pub fn commandsmatch() -> HashMap<String, Commands> {
     let toml = toml()
         .ok()
-        .and_then(|s| s.customization.alies)
+        .and_then(|s| s.customization.alias)
         .unwrap_or_default();
 
     let mut hashmap = HashMap::new();
@@ -99,6 +99,7 @@ pub fn commandsmatch() -> HashMap<String, Commands> {
         toml.switch_vault.unwrap_or("switch-vault".to_string()),
         Commands::SwitchVault,
     );
+    hashmap.insert(toml.gp.unwrap_or("gp".to_string()), Commands::Gp);
     hashmap.insert(toml.toma.unwrap_or("toma".to_string()), Commands::Toma);
     hashmap
 }
@@ -160,11 +161,8 @@ fn interface() -> anyhow::Result<()> {
             }
         }
         Some(Commands::Gp) => {
-            let len = data
-                .get_token(&1)
-                .map(|s| s.to_string().trim().parse::<u32>())?;
-
-            generate_password(Some(len?)).pe()?;
+            let len = data.get_token(&1).unwrap_or("32");
+            generate_password(Some(len.to_string())).pe()?;
         }
         Some(Commands::Import) => {
             import_helper(&data, 1).pe()?;
@@ -189,13 +187,8 @@ fn interface() -> anyhow::Result<()> {
             toma(&data, 1).pe()?;
         }
         None => {
-            if !data.get_token(&0)?.is_empty() {
-                println!(
-                    ">>The command [{}] you used is not vaild command please use [{} -l] to check all the available commands",
-                    data.get_token(&0)?.bright_red().bold(),
-                    "help".bright_yellow().bold()
-                )
-            }
+            let cmp = data.get_token(&0)?;
+            basic_hinter_based_in_config(cmp).pe()?;
         }
     }
     Ok(())

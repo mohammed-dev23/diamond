@@ -9,7 +9,7 @@ use aes_gcm::{
     AeadCore, Aes256Gcm, Key, KeyInit, Nonce,
     aead::{Aead, OsRng, rand_core::RngCore},
 };
-use argon2::Argon2;
+use argon2::{Argon2, Params};
 use serde::{Deserialize, Serialize};
 
 use crate::{toml::toml, vault::home_dirr};
@@ -97,7 +97,10 @@ pub fn enc(
 ) -> anyhow::Result<Encrypted> {
     let mut salt = [0u8; 32];
     OsRng.fill_bytes(&mut salt);
-    let argon2 = Argon2::default();
+    let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
+        anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
+    })?;
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param);
     let mut out_master = Zeroizing::new([0u8; 32]);
 
     argon2
@@ -158,7 +161,10 @@ pub fn dec(
         BASE64_STANDARD.decode(&entry._2fa_.totp_secret)?,
     );
 
-    let argon2 = Argon2::default();
+    let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
+        anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
+    })?;
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param);
     let mut out_pass = Zeroizing::new([0u8; 32]);
     let totp_s = Zeroizing::new(totp_s);
 
@@ -193,7 +199,10 @@ pub type EncV = ([u8; 32], [u8; 12], Vec<u8>, Vec<u8>, Vec<u8>);
 pub fn enc_vault(master_key: &str, _vault_: String, _2fa_s: Vec<u8>) -> anyhow::Result<EncV> {
     let mut salt = [0u8; 32];
     OsRng.fill_bytes(&mut salt);
-    let argon2 = Argon2::default();
+    let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
+        anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
+    })?;
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param);
     let mut out_master = Zeroizing::new([0u8; 32]);
     let _2fa_s = Zeroizing::new(_2fa_s);
 
@@ -254,7 +263,10 @@ pub fn dec_vault(master_key: &str, path_of_vault: &str) -> anyhow::Result<(Vec<u
         );
 
         let mut out_master = Zeroizing::new([0u8; 32]);
-        Argon2::default()
+        let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
+            anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
+        })?;
+        Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param)
             .hash_password_into(master_key.as_bytes(), &salt_decoded, &mut *out_master)
             .map_err(|e| anyhow!("Couldn't hash the master-key <{e}>"))?;
 
