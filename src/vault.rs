@@ -1,5 +1,5 @@
 use crate::crypto::Fields;
-use crate::toml;
+use crate::toml as tomalll;
 use anyhow::anyhow;
 use std::{env::home_dir, fs, path::PathBuf};
 
@@ -22,14 +22,14 @@ pub fn _init_() -> anyhow::Result<()> {
     if fs::File::open(home_dirr()?.join("diamond/gem.toml"))
         .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
     {
-        toml::toml_init()?;
+        tomalll::toml_init()?;
     }
 
     if fs::File::open(home_dirr()?.join("diamond/gem.json"))
         .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
     {
         let json_init = serde_json::to_string_pretty::<Vec<Fields>>(&vec![])?;
-        let main_vault: PathBuf = toml()?.dependencies.main_vault_path.into();
+        let main_vault: PathBuf = tomalll::toml()?.dependencies.main_vault_path.into();
 
         fs::write(main_vault, json_init)?;
     }

@@ -10,12 +10,8 @@ use std::{
     fs,
     io::{Read, Write, stdin, stdout},
     path::PathBuf,
-    thread::sleep,
-    time::Duration,
 };
 use zeroize::Zeroizing;
-
-use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::crypto::{_2fa_auth, Entry, Fields, dec, enc, read_json};
 use crate::{
@@ -39,7 +35,7 @@ pub fn add(
 ) -> anyhow::Result<()> {
     let password = if password.contains("gp") {
         //we recommend the password to be 32 characters
-        generate_password(Some(32))?
+        generate_password(Some("32".to_string()))?
     } else {
         password.to_string()
     };
@@ -150,22 +146,6 @@ pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow
                 .bold(),
             "it will take 5s..".bright_purple().bold()
         );
-
-        let mut sec = 5;
-
-        while sec > 0 {
-            let pb = ProgressBar::new(5);
-
-            for _ in 0..5 {
-                sleep(Duration::from_secs(1));
-                pb.clone()
-                    .with_style(ProgressStyle::with_template(
-                        "⏳ ~> [{bar:40.cyan/blue}] {pos}/{len}s",
-                    )?)
-                    .inc(1);
-            }
-            sec = 0
-        }
 
         println!(
             ">>{}: got [{}] [{}]",
@@ -290,8 +270,12 @@ pub fn search(id: &str, ef: Option<&str>) -> anyhow::Result<()> {
     }
     Ok(())
 }
-pub fn generate_password(len: Option<u32>) -> anyhow::Result<String> {
-    let len = len.unwrap_or(16);
+pub fn generate_password(len: Option<String>) -> anyhow::Result<String> {
+    let len = if let Some(len) = len {
+        len.trim().parse::<u32>()?
+    } else {
+        32
+    };
 
     if len < 16 {
         return Err(anyhow!(

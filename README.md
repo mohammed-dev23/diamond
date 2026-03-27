@@ -204,15 +204,15 @@ switch-vault any.json
 ```
 #### toma a toml config manager
 ```
-toma <toml-file-path/main-vault-path/username/allies> <old-value> <new-value> |if allies <add/get/etc..> <new-allies>|
+toma <toml-file-path/main-vault-path/username/alias> <old-value> <new-value> |if allies <add/get/etc..> <new-alias>|
 ```
 Example:
 ```
 toma toml-file-path new_path.toml
 toma main-vault-path new_path.json
 toma username gem!.
-toma alies add ahh
-toma alies list ls 
+toma alias add ahh
+toma alias list ls 
 ```
 ## Password Requirements
 
@@ -239,6 +239,7 @@ Each entry stores:
 - `identifier`: the identifier you added
 - `password`: the password of identifier
 - `date`: the date of when the entry was created
+- `2fa` : the TOTP vaules 
 
 ## Building from Source
 
@@ -256,6 +257,7 @@ cargo run
 - The master key encrypts/decrypts your vault and everything else
 - Loss of master-key means permanent data loss
 - Store vault backups securely
+- Loss of TOTP key given in adding means permanent data loss
 
 ## Platform Support
 
