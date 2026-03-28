@@ -42,7 +42,6 @@ pub struct Alias {
     pub gp: Option<String>,
     pub import: Option<String>,
     pub help: Option<String>,
-    pub rename: Option<String>,
     pub update: Option<String>,
     pub note: Option<String>,
     pub fuzzy: Option<String>,
@@ -140,10 +139,6 @@ pub fn toma(data: &Vec<String>, mut index: usize) -> anyhow::Result<()> {
                     toml_file.customization.alias.get_or_insert_default().list =
                         Some(new_alias.to_string());
                 }
-                "rename" => {
-                    toml_file.customization.alias.get_or_insert_default().rename =
-                        Some(new_alias.to_string());
-                }
                 "clear" => {
                     toml_file.customization.alias.get_or_insert_default().clear =
                         Some(new_alias.to_string());
@@ -222,7 +217,6 @@ pub fn basic_hinter_based_in_config(input: &str) -> anyhow::Result<()> {
         "export" => check_and_print(&toml.export),
         "import" => check_and_print(&toml.import),
         "exit" => check_and_print(&toml.exit),
-        "rename" => check_and_print(&toml.rename),
         "remove" => check_and_print(&toml.remove),
         "search" => check_and_print(&toml.search),
         "gp" => check_and_print(&toml.gp),

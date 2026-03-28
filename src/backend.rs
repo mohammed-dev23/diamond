@@ -64,7 +64,7 @@ pub mod safe {
         type Out = anyhow::Result<String>;
 
         fn master_key_checker(self) -> Self::Out {
-            if self.len() >= 16 {
+            if self.len() > 16 {
                 Ok(self)
             } else {
                 Err(anyhow!("The master key must be 16 characters at least "))

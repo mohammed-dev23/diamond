@@ -156,15 +156,6 @@ import <any.json> <new-any.json>
 
 **Keep in mind** in order to import you'll need the **master-key** you used in export 
 
-#### Rename
-```
-rename <old-id> <new-id> <<Option: external path>>
-```
-Example:
-```
-rename <any> <new-any>
-rename <any> <new-any> <<path.json>>
-```
 #### Update
 ```
 update <id> <new-identifier> <new-password> <<Option: external path>>
@@ -248,6 +239,8 @@ Each entry stores:
 ```bash
 cargo build 
 cargo run
+cargo run -F dev #please don not use this without being careful because it uses default argon2 config instead of the strong params in normal cargo run || it's for dev only
+
 ```
 ## Security Considerations
 

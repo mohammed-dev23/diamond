@@ -1,4 +1,4 @@
-use crate::commands::{Flags, add, fuzzy, get, note, remove, rename, search, update};
+use crate::commands::{Flags, add, fuzzy, get, note, remove, search, update};
 use crate::{
     backend::{
         parser::Token,
@@ -50,7 +50,7 @@ pub fn add_helper(
     index += 1;
     let ef = data_token.get(index).map(|s| s.as_str());
 
-    let (master_key, _2fa_s) = helper_master_key(true)?;
+    let (master_key, _2fa_s) = helper_master_key(true, id).pe()?;
 
     let master_key = master_key
         .checker("Master-key".to_string())?
@@ -84,7 +84,7 @@ pub fn get_helper(
         ),
         encodded: Some(
             data.get_token(&index)
-                .map(|s| s == "--with-hex-fromat")
+                .map(|s| s == "--with-hex-format")
                 .unwrap_or(false),
         ),
         qrcode: Some(
@@ -110,7 +110,7 @@ pub fn get_helper(
 
     id_does_not_existe(id, ID_INDEX, data, ef).pe()?;
 
-    let (master_key, _2fa_s) = helper_master_key(false)?;
+    let (master_key, _2fa_s) = helper_master_key(false, id).pe()?;
 
     let master_key = master_key
         .checker("Master-Key".to_string())?
@@ -166,7 +166,7 @@ pub fn export_helper(
     index += 1;
     let ef = data_token.get(index).map(|s| s.as_str());
 
-    let (master_key, _2fa_s) = helper_master_key(true)?;
+    let (master_key, _2fa_s) = helper_master_key(true, name_of_export).pe()?;
 
     let master_key = master_key
         .checker("Master-Key".to_string())?
@@ -192,7 +192,7 @@ pub fn import_helper(data: &Vec<String>, mut index: usize) -> anyhow::Result<()>
         .checker("the path of the vault".to_string())
         .pe()?;
 
-    let (master_key, _) = helper_master_key(false)?;
+    let (master_key, _) = helper_master_key(false, new_name).pe()?;
 
     let master_key = master_key
         .checker("Master-Key".to_string())?
@@ -212,7 +212,7 @@ pub fn help_helper_() -> anyhow::Result<()> {
     println!(
         ">> [{}] --[{}]",
         "help".bright_purple().bold(),
-        "add/get/remove/search/clear/exit/list/update/rename/note/fuzzy/switch-vault/toma"
+        "add/get/remove/search/clear/exit/list/update/note/fuzzy/switch-vault/toma"
             .bright_yellow()
             .bold()
     );
@@ -257,10 +257,6 @@ pub fn help_helper_() -> anyhow::Result<()> {
     println!(
         ">> <{}: used to change the password and the identifier by there id and using the master-key>",
         "update".bright_purple().bold(),
-    );
-    println!(
-        ">> <{}: used to rename ids>",
-        "rename".bright_purple().bold(),
     );
     println!(
         ">> <{}: used to change a note or add it>",
@@ -380,17 +376,6 @@ pub fn help_helper(data: &Vec<String>, index: usize) -> anyhow::Result<()> {
                 "new name for the imported vault".bright_yellow().bold(),
             );
         }
-        "--rename" => {
-            println!(
-                ">>{}: [{}] [{}] [{}] [{}] [<{}>]",
-                "Usage".bright_green().bold(),
-                "diamond".bright_blue().bold(),
-                "rename".bright_yellow().bold(),
-                "old-id".bright_yellow().bold(),
-                "new-id".bright_yellow().bold(),
-                "Option: external path".bright_yellow().bold(),
-            );
-        }
         "--update" => {
             println!(
                 ">>{}: [{}] [{}] [{}] [{}] [{}] [<{}>]",
@@ -464,7 +449,7 @@ pub fn help_helper(data: &Vec<String>, index: usize) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn helper_master_key(totp_make: bool) -> anyhow::Result<(String, Vec<u8>)> {
+fn helper_master_key(totp_make: bool, id: &str) -> anyhow::Result<(String, Vec<u8>)> {
     let format = format!(
         ">>{} Your {}{}{} :",
         "Enter".bright_cyan().bold(),
@@ -480,25 +465,29 @@ fn helper_master_key(totp_make: bool) -> anyhow::Result<(String, Vec<u8>)> {
 
     master_key_matcher(&master_key_input)?;
 
-    let raw_s = if totp_make {
-        let _2fa_s = totp_rs::Secret::generate_secret();
-        let raw_s_2fa = _2fa_s.to_bytes()?;
-        let user_2fa = _2fa_s.to_encoded().to_string();
+    if master_key_input.len() > 16 {
+        let raw_s = if totp_make {
+            let _2fa_s = totp_rs::Secret::generate_secret();
+            let raw_s_2fa = _2fa_s.to_bytes()?;
+            let user_2fa = _2fa_s.to_encoded().to_string();
 
-        println!(
-            ">>TOTP secret for <{}> | [{}]",
-            user_2fa.bright_green().bold(),
-            "Add this to your authenticator app before continuing!"
-                .bright_purple()
-                .bold()
-        );
+            println!(
+                ">>TOTP secret for >{}< is <{}> | [{}]",
+                user_2fa.bright_green().bold(),
+                id.bright_cyan().bold(),
+                "Add this to your authenticator app before continuing!"
+                    .bright_purple()
+                    .bold()
+            );
 
-        raw_s_2fa
+            raw_s_2fa
+        } else {
+            Vec::new()
+        };
+        Ok((master_key_input, raw_s))
     } else {
-        Vec::new()
-    };
-
-    Ok((master_key_input, raw_s))
+        Err(anyhow!("The master key must be 16 characters at least"))
+    }
 }
 
 pub fn master_key_matcher(master_key: &str) -> anyhow::Result<()> {
@@ -518,23 +507,6 @@ pub fn master_key_matcher(master_key: &str) -> anyhow::Result<()> {
     } else {
         Err(anyhow!("The master key didn't match try again!"))
     }
-}
-
-pub fn rename_helper(
-    data: &Vec<String>,
-    data_token: &[String],
-    mut index: usize,
-) -> anyhow::Result<()> {
-    let old_id = data.get_token(&index).checker("old id".to_string()).pe()?;
-    index += 1;
-    let new_id = data.get_token(&index).checker("new id".to_string()).pe()?;
-    index += 1;
-    let ef = data_token.get(index).map(|s| s.as_str());
-
-    id_does_not_existe(old_id, ID_INDEX, data, ef).pe()?;
-
-    rename(old_id, new_id, ef)?;
-    Ok(())
 }
 
 pub fn update_helper(
@@ -558,7 +530,7 @@ pub fn update_helper(
 
     id_does_not_existe(id, ID_INDEX, data, ef).pe()?;
 
-    let (master_key, _) = helper_master_key(false)?;
+    let (master_key, _) = helper_master_key(false, id)?;
 
     let master_key = master_key
         .checker("master-key".to_string())?

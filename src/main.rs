@@ -18,7 +18,7 @@ use crate::{
     commands::{generate_password, list, switch_vault},
     helpers::{
         EF_INDEX, ID_INDEX, add_helper, export_helper, fuzzy_helper, get_helper, help_helper,
-        import_helper, note_helper, remove_helper, rename_helper, search_helper, update_helper,
+        import_helper, note_helper, remove_helper, search_helper, update_helper,
     },
     toml::{basic_hinter_based_in_config, toma, toml},
     vault::{_init_, print_mini_logo},
@@ -47,7 +47,6 @@ pub enum Commands {
     Gp,
     Import,
     Help,
-    Rename,
     Update,
     Note,
     Fuzzy,
@@ -84,10 +83,6 @@ pub fn commandsmatch() -> HashMap<String, Commands> {
         Commands::Import,
     );
     hashmap.insert(toml.help.unwrap_or("help".to_string()), Commands::Help);
-    hashmap.insert(
-        toml.rename.unwrap_or("rename".to_string()),
-        Commands::Rename,
-    );
     hashmap.insert(
         toml.update.unwrap_or("update".to_string()),
         Commands::Update,
@@ -166,9 +161,6 @@ fn interface() -> anyhow::Result<()> {
         }
         Some(Commands::Import) => {
             import_helper(&data, 1).pe()?;
-        }
-        Some(Commands::Rename) => {
-            rename_helper(&data, &data_token, ID_INDEX).pe()?;
         }
         Some(Commands::Update) => {
             update_helper(&data, &data_token, ID_INDEX).pe()?;

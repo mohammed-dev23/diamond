@@ -1,6 +1,8 @@
 use anyhow::anyhow;
 use base64::prelude::*;
 use colored::Colorize;
+use hmac::Mac;
+use sha2::Sha256;
 use std::{fs, io::Read, path::PathBuf};
 use totp_rs::TOTP;
 use zeroize::Zeroizing;
@@ -9,7 +11,11 @@ use aes_gcm::{
     AeadCore, Aes256Gcm, Key, KeyInit, Nonce,
     aead::{Aead, OsRng, rand_core::RngCore},
 };
-use argon2::{Argon2, Params};
+use argon2::Argon2;
+
+#[cfg(not(feature = "dev"))]
+use argon2::Params;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{toml::toml, vault::home_dirr};
@@ -33,6 +39,7 @@ pub struct Entry {
     #[serde(default = "def_date")]
     pub date: String,
     pub _2fa_: _2fa_,
+    pub mac: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -87,25 +94,48 @@ pub fn read_json(ef: Option<&str>) -> anyhow::Result<Vec<Fields>> {
     }
 }
 
-pub type Encrypted = ([u8; 32], Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
+pub type Encrypted = (
+    [u8; 32],
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+);
+pub type HamcSha256 = hmac::Hmac<Sha256>;
 
 pub fn enc(
     master_key: &str,
     username_email: &str,
     password: &str,
     totp_s: &[u8],
+    id: &str,
 ) -> anyhow::Result<Encrypted> {
     let mut salt = [0u8; 32];
     OsRng.fill_bytes(&mut salt);
-    let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
-        anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
-    })?;
-    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param);
+
     let mut out_master = Zeroizing::new([0u8; 32]);
 
-    argon2
-        .hash_password_into(master_key.as_bytes(), &salt, &mut *out_master)
-        .map_err(|_| anyhow!("Couldn't hash master key"))?;
+    #[cfg(not(feature = "dev"))]
+    {
+        let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
+            anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
+        })?;
+
+        let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param);
+        argon2
+            .hash_password_into(master_key.as_bytes(), &salt, &mut *out_master)
+            .map_err(|_| anyhow!("Couldn't hash master key"))?;
+    }
+
+    #[cfg(feature = "dev")]
+    {
+        let argon2 = Argon2::default();
+        argon2
+            .hash_password_into(master_key.as_bytes(), &salt, &mut *out_master)
+            .map_err(|_| anyhow!("Couldn't hash master key"))?;
+    }
 
     let key = Key::<Aes256Gcm>::from_slice(&*out_master);
     let cip = Aes256Gcm::new(key);
@@ -129,6 +159,16 @@ pub fn enc(
     nonce.extend_from_slice(&password_nonce);
     nonce.extend_from_slice(&username_nonce);
 
+    let mut all = Vec::new();
+    all.extend_from_slice(&username);
+    all.extend_from_slice(&password);
+    all.extend_from_slice(&totp_secret);
+    all.extend_from_slice(id.as_bytes());
+
+    let mut mac = <HamcSha256 as Mac>::new_from_slice(&*out_master)?;
+    mac.update(&all);
+    let mac_final = mac.finalize().into_bytes().to_vec();
+
     Ok((
         salt,
         nonce,
@@ -136,6 +176,7 @@ pub fn enc(
         password,
         totp_nonce.to_vec(),
         totp_secret,
+        mac_final,
     ))
 }
 
@@ -152,25 +193,53 @@ pub fn dec(
         return Err(anyhow!("Couldn't get data"));
     };
 
-    let (salt, nonce, username, password, totp_n, totp_s) = (
+    let (salt, nonce, username, password, totp_n, totp_s, mac) = (
         BASE64_STANDARD.decode(&entry.salt)?,
         BASE64_STANDARD.decode(&entry.nonce)?,
         BASE64_STANDARD.decode(&entry.identifier)?,
         BASE64_STANDARD.decode(&entry.password)?,
         BASE64_STANDARD.decode(&entry._2fa_.totp_nonce)?,
         BASE64_STANDARD.decode(&entry._2fa_.totp_secret)?,
+        BASE64_STANDARD.decode(&entry.mac)?,
     );
 
-    let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
-        anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
-    })?;
-    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param);
     let mut out_pass = Zeroizing::new([0u8; 32]);
     let totp_s = Zeroizing::new(totp_s);
 
-    argon2
-        .hash_password_into(master_key.as_bytes(), &salt, &mut *out_pass)
-        .map_err(|_| anyhow!("Couldn't hash master key"))?;
+    #[cfg(not(feature = "dev"))]
+    {
+        let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
+            anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
+        })?;
+        let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param);
+
+        argon2
+            .hash_password_into(master_key.as_bytes(), &salt, &mut *out_pass)
+            .map_err(|_| anyhow!("Couldn't hash master key"))?;
+    }
+
+    #[cfg(feature = "dev")]
+    {
+        let argon2 = Argon2::default();
+
+        argon2
+            .hash_password_into(master_key.as_bytes(), &salt, &mut *out_pass)
+            .map_err(|_| anyhow!("Couldn't hash master key"))?;
+    }
+
+    if !mac.is_empty() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&username);
+        data.extend_from_slice(&password);
+        data.extend_from_slice(&totp_s);
+        data.extend_from_slice(entry.id.as_bytes());
+
+        let mut mac_new = <HamcSha256 as Mac>::new_from_slice(&*out_pass)?;
+        mac_new.update(&data);
+        mac_new
+            .verify_slice(&mac)
+            .map_err(|_| anyhow!("Integrity check failed! Vault may have been tampered with."))?;
+    }
 
     let key = Key::<Aes256Gcm>::from_slice(&*out_pass);
     let cip = Aes256Gcm::new(key);
@@ -199,16 +268,28 @@ pub type EncV = ([u8; 32], [u8; 12], Vec<u8>, Vec<u8>, Vec<u8>);
 pub fn enc_vault(master_key: &str, _vault_: String, _2fa_s: Vec<u8>) -> anyhow::Result<EncV> {
     let mut salt = [0u8; 32];
     OsRng.fill_bytes(&mut salt);
-    let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
-        anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
-    })?;
-    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param);
+
     let mut out_master = Zeroizing::new([0u8; 32]);
     let _2fa_s = Zeroizing::new(_2fa_s);
 
-    argon2
-        .hash_password_into(master_key.as_bytes(), &salt, &mut *out_master)
-        .map_err(|_| anyhow!("Couldn't hash master key"))?;
+    #[cfg(feature = "dev")]
+    {
+        let argon2 = Argon2::default();
+        argon2
+            .hash_password_into(master_key.as_bytes(), &salt, &mut *out_master)
+            .map_err(|_| anyhow!("Couldn't hash master key"))?;
+    }
+
+    #[cfg(not(feature = "dev"))]
+    {
+        let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
+            anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
+        })?;
+        let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param);
+        argon2
+            .hash_password_into(master_key.as_bytes(), &salt, &mut *out_master)
+            .map_err(|_| anyhow!("Couldn't hash master key"))?;
+    }
 
     let key = Key::<Aes256Gcm>::from_slice(&*out_master);
     let cip = Aes256Gcm::new(key);
@@ -263,12 +344,24 @@ pub fn dec_vault(master_key: &str, path_of_vault: &str) -> anyhow::Result<(Vec<u
         );
 
         let mut out_master = Zeroizing::new([0u8; 32]);
-        let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
-            anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
-        })?;
-        Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param)
-            .hash_password_into(master_key.as_bytes(), &salt_decoded, &mut *out_master)
-            .map_err(|e| anyhow!("Couldn't hash the master-key <{e}>"))?;
+
+        #[cfg(feature = "dev")]
+        {
+            let argon2 = Argon2::default();
+            argon2
+                .hash_password_into(master_key.as_bytes(), &salt_decoded, &mut *out_master)
+                .map_err(|e| anyhow!("Couldn't hash the master-key <{e}>"))?;
+        }
+
+        #[cfg(not(feature = "dev"))]
+        {
+            let param = Params::new(256 * 1024, 3, 4, Some(32)).map_err(|_| {
+                anyhow!("[Couldn't set argon2 perm] please dont use it if you got this err!")
+            })?;
+            Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, param)
+                .hash_password_into(master_key.as_bytes(), &salt_decoded, &mut *out_master)
+                .map_err(|e| anyhow!("Couldn't hash the master-key <{e}>"))?;
+        }
 
         let key = Key::<Aes256Gcm>::from_slice(&*out_master);
         let cip = Aes256Gcm::new(key);

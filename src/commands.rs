@@ -47,15 +47,16 @@ pub fn add(
 
     let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
 
-    let enc = enc(&master_key, username_email, &password, &_2fa_)?;
+    let enc = enc(&master_key, username_email, &password, &_2fa_, &id)?;
 
-    let (salt, nonce, username, password, _2fa_n, _2fa_s) = (
+    let (salt, nonce, username, password, _2fa_n, _2fa_s, mac) = (
         BASE64_STANDARD.encode(enc.0),
         BASE64_STANDARD.encode(enc.1),
         BASE64_STANDARD.encode(enc.2),
         BASE64_STANDARD.encode(enc.3),
         BASE64_STANDARD.encode(enc.4),
         BASE64_STANDARD.encode(enc.5),
+        BASE64_STANDARD.encode(enc.6),
     );
 
     let date_of_adding = chrono::Local::now().to_string();
@@ -75,6 +76,7 @@ pub fn add(
                 totp_secret: _2fa_s,
                 totp_nonce: _2fa_n,
             },
+            mac: mac,
         },
     };
 
@@ -139,13 +141,6 @@ pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow
     {
         terminal_clipboard::set_string(&password)
             .map_err(|_| anyhow!("Clouldn't copy to clipboard!"))?;
-        println!(
-            ">>{}, {}",
-            "wait for the password to be saved in the clipboard"
-                .bright_blue()
-                .bold(),
-            "it will take 5s..".bright_purple().bold()
-        );
 
         println!(
             ">>{}: got [{}] [{}]",
@@ -359,33 +354,6 @@ pub fn atomic_writer(path: &PathBuf, content: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn rename(id: &str, new_id: &str, ef: Option<&str>) -> anyhow::Result<()> {
-    let mut read_json = read_json(ef)?;
-
-    let valut_path: PathBuf = toml()?.dependencies.main_vault_path.into();
-
-    if let Some(idd) = read_json.iter_mut().find(|s| s.entry.id == id) {
-        idd.entry.id = new_id.to_string();
-    } else {
-        return Err(anyhow!("the id <{}> was not found", id));
-    }
-
-    let json = serde_json::to_string_pretty(&read_json)?;
-
-    if let Some(ef) = ef {
-        atomic_writer(&home_dirr()?.join(ef), &json)?;
-        #[cfg(unix)]
-        set_perm_over_file(&home_dirr()?.join(ef))?;
-    } else {
-        atomic_writer(&valut_path, &json)?;
-        #[cfg(unix)]
-        set_perm_over_file(&valut_path)?;
-    }
-
-    println!(">>{}", "renamed!".bright_cyan().bold());
-    Ok(())
-}
-
 pub fn update(
     master_key: &str,
     ef: Option<&str>,
@@ -408,18 +376,24 @@ pub fn update(
     let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
 
     if let Some(new) = read_json.iter_mut().find(|s| s.entry.id == id) {
-        let enc = enc(&master_key, new_user_name, &new_password, &_2fa_)?;
-        let (salt, nonce, username, password) = (
+        let enc = enc(&master_key, new_user_name, &new_password, &_2fa_, &id)?;
+        let (salt, nonce, username, password, totp_n, totp_s, mac) = (
             BASE64_STANDARD.encode(enc.0),
             BASE64_STANDARD.encode(enc.1),
             BASE64_STANDARD.encode(enc.2),
             BASE64_STANDARD.encode(enc.3),
+            BASE64_STANDARD.encode(enc.4),
+            BASE64_STANDARD.encode(enc.5),
+            BASE64_STANDARD.encode(enc.6),
         );
 
         new.entry.identifier = username;
         new.entry.password = password;
         new.entry.salt = salt;
         new.entry.nonce = nonce;
+        new.entry._2fa_.totp_nonce = totp_n;
+        new.entry._2fa_.totp_secret = totp_s;
+        new.entry.mac = mac;
     }
 
     let json = serde_json::to_string_pretty(&read_json)?;
