@@ -47,7 +47,7 @@ pub fn add(
 
     let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
 
-    let enc = enc(&master_key, username_email, &password, &_2fa_, &id)?;
+    let enc = enc(&master_key, username_email, &password, &_2fa_, id)?;
 
     let (salt, nonce, username, password, _2fa_n, _2fa_s, mac) = (
         BASE64_STANDARD.encode(enc.0),
@@ -76,7 +76,7 @@ pub fn add(
                 totp_secret: _2fa_s,
                 totp_nonce: _2fa_n,
             },
-            mac: mac,
+            mac,
         },
     };
 
@@ -85,6 +85,7 @@ pub fn add(
     let json = serde_json::to_string_pretty(&file)?;
 
     if let Some(o) = ef {
+        ef_validator(o)?;
         atomic_writer(&home_dirr()?.join(o), &json)?;
         #[cfg(unix)]
         set_perm_over_file(&home_dirr()?.join(o))?;
@@ -299,24 +300,39 @@ pub fn export(
     master_key: &str,
     _2fa_raw_s: Vec<u8>,
 ) -> anyhow::Result<()> {
+    export_import_name_validotor(name_of_export)?;
     let mut vault = String::new();
     let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
     let master_key = Zeroizing::new(master_key.to_string());
     if let Some(ef) = ef {
+        ef_validator(ef)?;
         fs::File::open(home_dirr()?.join(ef))?.read_to_string(&mut vault)?;
     } else {
         fs::File::open(main_vault_path)?.read_to_string(&mut vault)?;
     };
 
-    let (salt, nonce, data, _2fa_n, _2fa_s) = enc_vault(&master_key, vault, _2fa_raw_s)?;
-    let (encoded_salt, encoded_nonce, encoded_vault, encoded_nonce_totp, encoded_secret_totp) = (
+    let (salt, nonce, data, _2fa_n, _2fa_s, mac) = enc_vault(&master_key, vault, _2fa_raw_s)?;
+    let (
+        encoded_salt,
+        encoded_nonce,
+        encoded_vault,
+        encoded_nonce_totp,
+        encoded_secret_totp,
+        encoded_mac,
+    ) = (
         BASE64_STANDARD.encode(salt),
         BASE64_STANDARD.encode(nonce),
         BASE64_STANDARD.encode(data),
         BASE64_STANDARD.encode(_2fa_n),
         BASE64_STANDARD.encode(_2fa_s),
+        BASE64_STANDARD.encode(mac),
     );
+
+    let date_of_adding = chrono::Local::now().to_string();
+
     let content = crypto::VaultExport {
+        id: name_of_export.to_string(),
+        author: toml()?.customization.username,
         salt: encoded_salt,
         nonce: encoded_nonce,
         _2fa_: crypto::_2fa_ {
@@ -324,6 +340,8 @@ pub fn export(
             totp_nonce: encoded_nonce_totp,
         },
         vault: encoded_vault,
+        mac: encoded_mac,
+        date: date_of_adding,
     };
     let json = serde_json::to_string_pretty(&content)?;
     atomic_writer(&home_dirr()?.join(name_of_export), &json)?;
@@ -335,6 +353,7 @@ pub fn export(
 }
 
 pub fn import(master_key: &str, new_name: &str, path_of_vault: &str) -> anyhow::Result<()> {
+    export_import_name_validotor(new_name)?;
     let master_key = Zeroizing::new(master_key.to_string());
     let (dec, totp_s) = dec_vault(master_key.as_str(), path_of_vault)?;
     let dec: String = String::from_utf8(dec)?;
@@ -376,7 +395,7 @@ pub fn update(
     let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
 
     if let Some(new) = read_json.iter_mut().find(|s| s.entry.id == id) {
-        let enc = enc(&master_key, new_user_name, &new_password, &_2fa_, &id)?;
+        let enc = enc(&master_key, new_user_name, &new_password, &_2fa_, id)?;
         let (salt, nonce, username, password, totp_n, totp_s, mac) = (
             BASE64_STANDARD.encode(enc.0),
             BASE64_STANDARD.encode(enc.1),
@@ -491,5 +510,32 @@ pub fn switch_vault(valt_path: &str) -> anyhow::Result<()> {
         "switched".bright_blue().bold(),
         valt_path.bright_yellow().bold()
     );
+    Ok(())
+}
+
+pub fn ef_validator(ef: &str) -> anyhow::Result<()> {
+    if !ef.contains(".json") {
+        return Err(anyhow!("the external file must end with (.json)"));
+    }
+
+    if ef.contains(home_dirr()?.to_string_lossy().to_string().trim()) {
+        return Err(anyhow!(
+            "the external file must start with it's name or it's location in the home directory"
+        ));
+    }
+    Ok(())
+}
+
+pub fn export_import_name_validotor(name: &str) -> anyhow::Result<()> {
+    if !name.contains(".json") {
+        return Err(anyhow!("the name of the file must end with (.json)"));
+    }
+
+    if name.contains(home_dirr()?.to_string_lossy().to_string().trim()) {
+        return Err(anyhow!(
+            "the file must start with it's name or it's location in the home directory"
+        ));
+    }
+
     Ok(())
 }

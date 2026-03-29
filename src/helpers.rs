@@ -473,8 +473,8 @@ fn helper_master_key(totp_make: bool, id: &str) -> anyhow::Result<(String, Vec<u
 
             println!(
                 ">>TOTP secret for >{}< is <{}> | [{}]",
-                user_2fa.bright_green().bold(),
-                id.bright_cyan().bold(),
+                id.bright_green().bold(),
+                user_2fa.bright_cyan().bold(),
                 "Add this to your authenticator app before continuing!"
                     .bright_purple()
                     .bold()

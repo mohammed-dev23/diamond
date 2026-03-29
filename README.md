@@ -24,6 +24,8 @@ diamond uses industry-standard cryptography:
 - **Memory Safety**: Zeroizing for sensitive data in memory
 - **File Permissions**: Unix 0600 (owner read/write only)
 - **2fa per Entry**: in add you get 2fa key you add that key in your authenticator so you can make get/update the same thing goes when you make export you will get a key and so on!   
+- **HAMC** to prevent file tampering
+- **Hkdf** to drive multiple keys from one
 
 All passwords are encrypted before storage. The master key never touches disk in plaintext.
 
@@ -231,6 +233,7 @@ Each entry stores:
 - `password`: the password of identifier
 - `date`: the date of when the entry was created
 - `2fa` : the TOTP vaules 
+- `mac` : the mac from the hmac
 
 ## Building from Source
 

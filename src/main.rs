@@ -8,8 +8,6 @@ mod helpers;
 mod test;
 mod toml;
 mod vault;
-use rustyline::{DefaultEditor, error::ReadlineError};
-
 use crate::{
     backend::{
         parser::{Token, parse_input, parse_input_by_token},
@@ -23,6 +21,16 @@ use crate::{
     toml::{basic_hinter_based_in_config, toma, toml},
     vault::{_init_, print_mini_logo},
 };
+use rustyline::{
+    Completer, CompletionType, Config, Editor, Helper, Highlighter, Hinter, Validator,
+    completion::FilenameCompleter, error::ReadlineError,
+};
+
+#[derive(Helper, Completer, Hinter, Highlighter, Validator)]
+struct DiamondHelper {
+    #[rustyline(Completer)]
+    completer: FilenameCompleter,
+}
 
 fn main() -> anyhow::Result<()> {
     _init_()?;
@@ -100,7 +108,14 @@ pub fn commandsmatch() -> HashMap<String, Commands> {
 }
 
 fn interface() -> anyhow::Result<()> {
-    let mut rl = DefaultEditor::new()?;
+    let config = Config::builder()
+        .completion_type(CompletionType::List)
+        .build();
+
+    let mut rl = Editor::with_config(config)?;
+    rl.set_helper(Some(DiamondHelper {
+        completer: FilenameCompleter::new(),
+    }));
 
     let username = toml().pe()?.customization.username;
 
