@@ -1,7 +1,8 @@
 use crate::crypto::Fields;
 use crate::toml as tomalll;
 use anyhow::anyhow;
-use std::{env::home_dir, fs, path::PathBuf};
+use dirs::home_dir;
+use std::{fs, path::PathBuf};
 
 #[cfg(unix)]
 pub fn set_perm_over_file(path: &PathBuf) -> anyhow::Result<()> {
@@ -37,13 +38,7 @@ pub fn _init_() -> anyhow::Result<()> {
 }
 
 pub fn home_dirr() -> anyhow::Result<PathBuf> {
-    let home_dir = if let Some(h) = home_dir() {
-        h
-    } else {
-        return Err(anyhow!("couldn't find home dir"));
-    };
-
-    Ok(home_dir)
+    home_dir().ok_or_else(|| anyhow!("couldn't find home dir"))
 }
 
 pub fn print_mini_logo() {

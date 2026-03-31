@@ -5,7 +5,7 @@ pub mod safe {
     use colored::Colorize;
     use zxcvbn::Score;
 
-    use crate::{backend::parser::Token, crypto::read_json};
+    use crate::crypto::read_json;
 
     pub trait Checkers {
         type Out;
@@ -191,20 +191,17 @@ pub mod safe {
         }
     }
 
-    pub fn id_does_not_existe(
-        id: &str,
-        token: usize,
-        data: &Vec<String>,
-        ef: Option<&str>,
-    ) -> anyhow::Result<()> {
-        if id
-            .to_string()
-            .check_existing_ids(data.get_token(&token)?, ef)
-            .is_ok()
-        {
-            return Err(anyhow!("The id does not exist!"));
+    pub fn id_does_not_existe(id: &str, ef: Option<&str>) -> anyhow::Result<()> {
+        let read_json = read_json(ef)?;
+
+        if read_json.iter().find(|s| s.entry.id == id).is_some() {
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "the id does not exist ! <{}>",
+                id.bright_yellow().bold()
+            ))
         }
-        Ok(())
     }
 }
 
@@ -258,6 +255,21 @@ pub mod parser {
     }
 
     impl Token for Vec<String> {
+        fn get_token(&self, index: &usize) -> anyhow::Result<&str> {
+            if self.is_empty() && *index == 0 {
+                return Ok("");
+            }
+
+            if let Some(d) = self.get(*index) {
+                Ok(d.as_str())
+            } else {
+                use anyhow::anyhow;
+                Err(anyhow!("Couldn't get data from the parser!"))
+            }
+        }
+    }
+
+    impl Token for &[String] {
         fn get_token(&self, index: &usize) -> anyhow::Result<&str> {
             if self.is_empty() && *index == 0 {
                 return Ok("");

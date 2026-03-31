@@ -80,7 +80,11 @@ pub fn read_json(ef: Option<&str>) -> anyhow::Result<Vec<Fields>> {
     let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
 
     let mut o = if let Some(ef) = ef {
-        ef_validator(ef)?;
+        let mut ef: PathBuf = ef.into();
+        if let Some(efc) = ef_validator(&ef)? {
+            ef = efc;
+        }
+
         let o = fs::File::open(home_dirr()?.join(ef));
 
         if o.as_ref()
@@ -146,10 +150,14 @@ pub fn enc(
             .map_err(|_| anyhow!("Couldn't hash master key"))?;
     }
 
-    let (enc_key, mac_key, totp_key) = derive_keys(&out_master, salt.as_ref())?;
+    let (id_key, mac_key, totp_key, password_key) = derive_keys(&out_master, salt.as_ref())?;
 
-    let key = Key::<Aes256Gcm>::from_slice(&*enc_key);
-    let cip = Aes256Gcm::new(key);
+    let id_key = Key::<Aes256Gcm>::from_slice(&*id_key);
+    let id_cip = Aes256Gcm::new(id_key);
+
+    let password_key = Key::<Aes256Gcm>::from_slice(&*password_key);
+    let password_cip = Aes256Gcm::new(password_key);
+
     let username_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let password_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let totp_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
@@ -157,11 +165,11 @@ pub fn enc(
     let key_totp = Key::<Aes256Gcm>::from_slice(&*totp_key);
     let cip_totp = Aes256Gcm::new(key_totp);
 
-    let username = cip
+    let username = id_cip
         .encrypt(&username_nonce, username_email.as_bytes())
         .map_err(|_| anyhow!("Couldn't enc data"))?;
 
-    let password = cip
+    let password = password_cip
         .encrypt(&password_nonce, password.as_bytes())
         .map_err(|_| anyhow!("Couldn't enc data"))?;
 
@@ -244,7 +252,7 @@ pub fn dec(
             .map_err(|_| anyhow!("Couldn't hash master key"))?;
     }
 
-    let (enc_key, mac_key, totp_key) = derive_keys(&out_pass, &salt)?;
+    let (id_key, mac_key, totp_key, password_key) = derive_keys(&out_pass, &salt)?;
 
     if !mac.is_empty() {
         let mut data = Vec::new();
@@ -265,8 +273,11 @@ pub fn dec(
         return Err(anyhow!("MAC was not found!"));
     }
 
-    let key = Key::<Aes256Gcm>::from_slice(&*enc_key);
-    let cip = Aes256Gcm::new(key);
+    let id_key = Key::<Aes256Gcm>::from_slice(&*id_key);
+    let id_cip = Aes256Gcm::new(id_key);
+
+    let password_key = Key::<Aes256Gcm>::from_slice(&*password_key);
+    let password_cip = Aes256Gcm::new(password_key);
 
     let key_totp = Key::<Aes256Gcm>::from_slice(&*totp_key);
     let cip_totp = Aes256Gcm::new(key_totp);
@@ -276,10 +287,10 @@ pub fn dec(
     let username_nonce_n = Nonce::from_slice(useranme_nonce);
     let totp_n = Nonce::from_slice(&totp_n);
 
-    let username = cip
+    let username = id_cip
         .decrypt(username_nonce_n, username.as_ref())
         .map_err(|_| anyhow!("Couldn't dec data | try again with the correct master-key!"))?;
-    let password = cip
+    let password = password_cip
         .decrypt(password_nonce_n, password.as_ref())
         .map_err(|_| anyhow!("Couldn't dec data | try again with the correct master-key!"))?;
 
@@ -318,7 +329,7 @@ pub fn enc_vault(master_key: &str, _vault_: String, _2fa_s: Vec<u8>) -> anyhow::
             .map_err(|_| anyhow!("Couldn't hash master key"))?;
     }
 
-    let (enc_key, mac_key, totp_key) = derive_keys(&out_master, salt.as_ref())?;
+    let (enc_key, mac_key, totp_key, _) = derive_keys(&out_master, salt.as_ref())?;
 
     let key = Key::<Aes256Gcm>::from_slice(&*enc_key);
     let cip = Aes256Gcm::new(key);
@@ -418,7 +429,7 @@ pub fn dec_vault(master_key: &str, path_of_vault: &str) -> anyhow::Result<(Vec<u
                 .map_err(|e| anyhow!("Couldn't hash the master-key <{e}>"))?;
         }
 
-        let (enc_key, mac_key, totp_key) = derive_keys(&out_master, &salt_decoded)?;
+        let (enc_key, mac_key, totp_key, _) = derive_keys(&out_master, &salt_decoded)?;
 
         let key = Key::<Aes256Gcm>::from_slice(&*enc_key);
         let cip = Aes256Gcm::new(key);
@@ -490,7 +501,23 @@ pub fn _2fa_auth(raw_s_totp: &[u8], id: &str) -> anyhow::Result<()> {
     }
 }
 
+pub fn reshow_2fa_key(raw_s_totp: &[u8], id: &str) -> anyhow::Result<String> {
+    let totp = TOTP::new(
+        totp_rs::Algorithm::SHA1,
+        6,
+        1,
+        30,
+        raw_s_totp.to_vec(),
+        None,
+        id.to_string(),
+    )?;
+
+    let code = totp.get_secret_base32();
+    Ok(code)
+}
+
 type Keys = (
+    Zeroizing<[u8; 32]>,
     Zeroizing<[u8; 32]>,
     Zeroizing<[u8; 32]>,
     Zeroizing<[u8; 32]>,
@@ -500,17 +527,21 @@ pub fn derive_keys(key: &[u8; 32], salt: &[u8]) -> anyhow::Result<Keys> {
     let hk = Hkdf::<Sha256>::new(Some(salt), key);
 
     let mut mac_key = Zeroizing::new([0u8; 32]);
-    let mut enc_key = Zeroizing::new([0u8; 32]);
+    let mut id_key = Zeroizing::new([0u8; 32]);
     let mut totp_key = Zeroizing::new([0u8; 32]);
+    let mut password_key = Zeroizing::new([0u8; 32]);
 
     hk.expand(b"diamond-mac-key", &mut *mac_key)
         .map_err(|_| anyhow!("Couldn't drive keys !"))?;
 
-    hk.expand(b"diamond-enc-key", &mut *enc_key)
+    hk.expand(b"diamond-id-key", &mut *id_key)
         .map_err(|_| anyhow!("Couldn't drive keys !"))?;
 
     hk.expand(b"diamond-totp-key", &mut *totp_key)
         .map_err(|_| anyhow!("Couldn't drive keys !"))?;
 
-    Ok((mac_key, enc_key, totp_key))
+    hk.expand(b"diamond-password-key", &mut *password_key)
+        .map_err(|_| anyhow!("Couldn't drive keys !"))?;
+
+    Ok((mac_key, id_key, totp_key, password_key))
 }

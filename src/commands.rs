@@ -9,11 +9,11 @@ use rand::RngExt;
 use std::{
     fs,
     io::{Read, Write, stdin, stdout},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 use zeroize::Zeroizing;
 
-use crate::crypto::{_2fa_auth, Entry, Fields, dec, enc, read_json};
+use crate::crypto::{_2fa_auth, Entry, Fields, dec, enc, read_json, reshow_2fa_key};
 use crate::{
     backend::safe::AnyHowErrHelper,
     crypto::{self, dec_vault, enc_vault},
@@ -33,7 +33,7 @@ pub fn add(
     ef: Option<&str>,
     _2fa_raw_s: Vec<u8>,
 ) -> anyhow::Result<()> {
-    let password = if password.contains("gp") {
+    let password = if password == "gp" {
         //we recommend the password to be 32 characters
         generate_password(Some("32".to_string()))?
     } else {
@@ -85,8 +85,13 @@ pub fn add(
     let json = serde_json::to_string_pretty(&file)?;
 
     if let Some(o) = ef {
-        ef_validator(o)?;
-        atomic_writer(&home_dirr()?.join(o), &json)?;
+        let mut o = PathBuf::from(o);
+
+        if let Some(s) = ef_validator(&o)? {
+            o = s;
+        }
+
+        atomic_writer(&home_dirr()?.join(&o), &json)?;
         #[cfg(unix)]
         set_perm_over_file(&home_dirr()?.join(o))?;
     } else {
@@ -110,6 +115,7 @@ pub struct Flags {
     pub clip: Option<bool>,
     pub encodded: Option<bool>,
     pub qrcode: Option<bool>,
+    pub totp: Option<bool>,
 }
 
 pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow::Result<()> {
@@ -127,6 +133,7 @@ pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow
     if matches!(flags.clip, Some(false))
         && matches!(flags.encodded, Some(false))
         && matches!(flags.qrcode, Some(false))
+        && matches!(flags.totp, Some(false))
     {
         println!(
             ">>{}: got [{}] [{}] [{}]",
@@ -174,6 +181,13 @@ pub fn get(id: &str, master_key: &str, flags: Flags, ef: Option<&str>) -> anyhow
             id.to_string().white().bold(),
             &encoded.bright_white().bold()
         );
+    }
+
+    if let Some(totp) = flags.totp
+        && totp
+    {
+        let totp = reshow_2fa_key(&totp_s, id)?;
+        println!(">>totp key [{}]", totp.bright_purple().bold());
     }
     Ok(())
 }
@@ -300,12 +314,22 @@ pub fn export(
     master_key: &str,
     _2fa_raw_s: Vec<u8>,
 ) -> anyhow::Result<()> {
-    export_import_name_validotor(name_of_export)?;
+    let mut name_of_export: PathBuf = name_of_export.into();
+
+    if let Some(s) = export_import_name_validotor(&name_of_export)? {
+        name_of_export = s;
+    }
+
     let mut vault = String::new();
     let main_vault_path: PathBuf = toml()?.dependencies.main_vault_path.into();
     let master_key = Zeroizing::new(master_key.to_string());
     if let Some(ef) = ef {
-        ef_validator(ef)?;
+        let mut ef = PathBuf::from(ef);
+
+        if let Some(s) = ef_validator(&ef)? {
+            ef = s;
+        }
+
         fs::File::open(home_dirr()?.join(ef))?.read_to_string(&mut vault)?;
     } else {
         fs::File::open(main_vault_path)?.read_to_string(&mut vault)?;
@@ -331,7 +355,7 @@ pub fn export(
     let date_of_adding = chrono::Local::now().to_string();
 
     let content = crypto::VaultExport {
-        id: name_of_export.to_string(),
+        id: name_of_export.to_string_lossy().to_string(),
         author: toml()?.customization.username,
         salt: encoded_salt,
         nonce: encoded_nonce,
@@ -344,25 +368,30 @@ pub fn export(
         date: date_of_adding,
     };
     let json = serde_json::to_string_pretty(&content)?;
-    atomic_writer(&home_dirr()?.join(name_of_export), &json)?;
+    atomic_writer(&home_dirr()?.join(&name_of_export), &json)?;
     #[cfg(unix)]
-    set_perm_over_file(&home_dirr()?.join(name_of_export))?;
+    set_perm_over_file(&home_dirr()?.join(&name_of_export))?;
 
     println!(">>{}", "exporting is done!".bright_cyan().bold());
     Ok(())
 }
 
 pub fn import(master_key: &str, new_name: &str, path_of_vault: &str) -> anyhow::Result<()> {
-    export_import_name_validotor(new_name)?;
+    let mut new_name: PathBuf = new_name.into();
+
+    if let Some(s) = export_import_name_validotor(&new_name)? {
+        new_name = s;
+    }
+
     let master_key = Zeroizing::new(master_key.to_string());
     let (dec, totp_s) = dec_vault(master_key.as_str(), path_of_vault)?;
     let dec: String = String::from_utf8(dec)?;
     _2fa_auth(&totp_s, path_of_vault)?;
     let json_args = serde_json::from_str::<Vec<Fields>>(dec.trim())?;
     let json = serde_json::to_string_pretty(&json_args)?;
-    atomic_writer(&home_dirr()?.join(new_name), &json)?;
+    atomic_writer(&home_dirr()?.join(&new_name), &json)?;
     #[cfg(unix)]
-    set_perm_over_file(&home_dirr()?.join(new_name))?;
+    set_perm_over_file(&home_dirr()?.join(&new_name))?;
     Ok(())
 }
 
@@ -513,29 +542,41 @@ pub fn switch_vault(valt_path: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn ef_validator(ef: &str) -> anyhow::Result<()> {
-    if !ef.contains(".json") {
+pub fn ef_validator(ef: &Path) -> anyhow::Result<Option<PathBuf>> {
+    let ef_with_ex = if !ef.ends_with(".json") {
+        ef.with_extension(".json")
+    } else {
         return Err(anyhow!("the external file must end with (.json)"));
-    }
+    };
 
-    if ef.contains(home_dirr()?.to_string_lossy().to_string().trim()) {
+    if ef
+        .to_string_lossy()
+        .to_string()
+        .contains(home_dirr()?.to_string_lossy().to_string().trim())
+    {
         return Err(anyhow!(
             "the external file must start with it's name or it's location in the home directory"
         ));
     }
-    Ok(())
+    Ok(Some(ef_with_ex))
 }
 
-pub fn export_import_name_validotor(name: &str) -> anyhow::Result<()> {
-    if !name.contains(".json") {
+pub fn export_import_name_validotor(name: &Path) -> anyhow::Result<Option<PathBuf>> {
+    let ef_with_ex = if !name.ends_with(".json") {
+        name.with_extension(".json")
+    } else {
         return Err(anyhow!("the name of the file must end with (.json)"));
-    }
+    };
 
-    if name.contains(home_dirr()?.to_string_lossy().to_string().trim()) {
+    if name
+        .to_string_lossy()
+        .to_string()
+        .contains(home_dirr()?.to_string_lossy().to_string().trim())
+    {
         return Err(anyhow!(
             "the file must start with it's name or it's location in the home directory"
         ));
     }
 
-    Ok(())
+    Ok(Some(ef_with_ex))
 }

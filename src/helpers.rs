@@ -15,11 +15,7 @@ use zeroize::Zeroizing;
 pub const ID_INDEX: usize = 1;
 pub const EF_INDEX: usize = 1;
 
-pub fn add_helper(
-    mut index: usize,
-    data: &Vec<String>,
-    data_token: &[String],
-) -> anyhow::Result<()> {
+pub fn add_helper(mut index: usize, data: &[String], data_token: &[String]) -> anyhow::Result<()> {
     let username_email = data
         .get_token(&index)
         .checker("identifier".to_string())
@@ -68,11 +64,7 @@ pub fn add_helper(
     Ok(())
 }
 
-pub fn get_helper(
-    mut index: usize,
-    data: &Vec<String>,
-    data_token: &[String],
-) -> anyhow::Result<()> {
+pub fn get_helper(mut index: usize, data: &[String], data_token: &[String]) -> anyhow::Result<()> {
     let id = data.get_token(&index).checker("id".to_string()).pe()?;
 
     index += 1;
@@ -92,6 +84,11 @@ pub fn get_helper(
                 .map(|s| s == "--as-qrcode")
                 .unwrap_or(false),
         ),
+        totp: Some(
+            data.get_token(&index)
+                .map(|s| s == "--totp")
+                .unwrap_or(false),
+        ),
     };
 
     if !flags.clip.unwrap_or(true)
@@ -108,7 +105,7 @@ pub fn get_helper(
         return Err(anyhow!("You can use flags in the place of <external file>"));
     }
 
-    id_does_not_existe(id, ID_INDEX, data, ef).pe()?;
+    id_does_not_existe(id, ef).pe()?;
 
     let (master_key, _2fa_s) = helper_master_key(false, id).pe()?;
 
@@ -124,7 +121,7 @@ pub fn get_helper(
 
 pub fn remove_helper(
     mut index: usize,
-    data: &Vec<String>,
+    data: &[String],
     data_token: &[String],
 ) -> anyhow::Result<()> {
     let id = data.get_token(&index).checker("id".to_string()).pe()?;
@@ -132,7 +129,7 @@ pub fn remove_helper(
     index += 1;
     let ef = data_token.get(index).map(|s| s.as_str());
 
-    id_does_not_existe(id, ID_INDEX, data, ef).pe()?;
+    id_does_not_existe(id, ef).pe()?;
 
     remove(id, ef).pe()?;
     Ok(())
@@ -140,21 +137,21 @@ pub fn remove_helper(
 
 pub fn search_helper(
     mut index: usize,
-    data: &Vec<String>,
+    data: &[String],
     data_token: &[String],
 ) -> anyhow::Result<()> {
     let id = data.get_token(&index).checker("id".to_string()).pe()?;
     index += 1;
     let ef = data_token.get(index).map(|s| s.as_str());
 
-    id_does_not_existe(id, ID_INDEX, data, ef).pe()?;
+    id_does_not_existe(id, ef).pe()?;
 
     search(id, ef).pe()?;
     Ok(())
 }
 
 pub fn export_helper(
-    data: &Vec<String>,
+    data: &[String],
     mut index: usize,
     data_token: &[String],
 ) -> anyhow::Result<()> {
@@ -180,7 +177,7 @@ pub fn export_helper(
     Ok(())
 }
 
-pub fn import_helper(data: &Vec<String>, mut index: usize) -> anyhow::Result<()> {
+pub fn import_helper(data: &[String], mut index: usize) -> anyhow::Result<()> {
     let path_of_exported_vault = data
         .get_token(&index)
         .checker("the name of the vault".to_string())
@@ -281,7 +278,7 @@ pub fn help_helper_() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn help_helper(data: &Vec<String>, index: usize) -> anyhow::Result<()> {
+pub fn help_helper(data: &[String], index: usize) -> anyhow::Result<()> {
     use colored::Colorize;
 
     match data.get_token(&index).unwrap_or_default() {
@@ -510,7 +507,7 @@ pub fn master_key_matcher(master_key: &str) -> anyhow::Result<()> {
 }
 
 pub fn update_helper(
-    data: &Vec<String>,
+    data: &[String],
     data_token: &[String],
     mut index: usize,
 ) -> anyhow::Result<()> {
@@ -528,7 +525,7 @@ pub fn update_helper(
     index += 1;
     let ef = data_token.get(index).map(|s| s.as_str());
 
-    id_does_not_existe(id, ID_INDEX, data, ef).pe()?;
+    id_does_not_existe(id, ef).pe()?;
 
     let (master_key, _) = helper_master_key(false, id)?;
 
@@ -543,11 +540,7 @@ pub fn update_helper(
     Ok(())
 }
 
-pub fn note_helper(
-    data: &Vec<String>,
-    data_token: &[String],
-    mut index: usize,
-) -> anyhow::Result<()> {
+pub fn note_helper(data: &[String], data_token: &[String], mut index: usize) -> anyhow::Result<()> {
     let id = data.get_token(&index).checker("id".to_string()).pe()?;
     index += 1;
     let notee = data_token
@@ -558,7 +551,7 @@ pub fn note_helper(
     index += 1;
     let ef = data_token.get(index).map(|s| s.as_str());
 
-    id_does_not_existe(id, ID_INDEX, data, ef).pe()?;
+    id_does_not_existe(id, ef).pe()?;
     note(id, &notee, ef)?;
     Ok(())
 }

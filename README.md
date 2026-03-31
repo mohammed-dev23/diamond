@@ -72,6 +72,7 @@ get <id> <flag> <<Option: external path>>
 - **--with-clipboard** -> saving the password to clipboard
 - **--as-qrcode** -> printing qrcode with identifier and password in it
 - **--with-hex-format** -> prints the identifier and password in hex format
+- **--totp** -> reshows the totp key
 
 **please keep in mind that the default flag is plaintext**
 Example:
